@@ -4,7 +4,7 @@ AI-powered production & demand forecasting for smarter food factories
 
 ## 🚀 Overview
 
-Oracle is an AI assistant that helps food factories (starting with meat production) make better decisions about demand forecasting, production planning, and raw material ordering.
+Clotho is an AI assistant that helps food factories (starting with meat production) make better decisions about demand forecasting, production planning, and raw material ordering.
 
 Factories often struggle with:
 
@@ -14,7 +14,7 @@ Underproducing → shortages & missed sales
 
 Manual planning → time-consuming & error-prone
 
-Oracle solves this by letting factories upload simple spreadsheets (sales history, inventory, and recipes). The AI (via Amazon Bedrock LLMs) analyzes the data and generates:
+Clotho solves this by letting factories upload simple spreadsheets (sales history, inventory, and recipes). The AI (via Amazon Bedrock LLMs) analyzes the data and generates:
 
 📈 Forecasts – demand prediction for each product (SKU)
 
