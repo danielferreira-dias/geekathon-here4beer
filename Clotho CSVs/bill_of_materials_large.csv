@@ -1,0 +1,9 @@
+sku,material_id,quantity_needed_per_unit
+sausages_1kg,pork_loins,2.0
+sausages_1kg,spices_mix,0.1
+chicken_breast,chicken_breast_raw,1.0
+pork_chops,pork_loins,1.5
+yogurt_pack,milk_raw,0.5
+yogurt_pack,culture_mix,0.05
+bread_loaf,flour,0.3
+bread_loaf,yeast,0.01
