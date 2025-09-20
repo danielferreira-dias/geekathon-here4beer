@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useAnalysis } from '@/hooks/useAnalysis'
+import { useAnalysis, type AnalysisFiles } from '@/hooks/useAnalysis'
 import { PageShell } from '@/components/common/PageShell'
 import { TopNav } from '@/components/common/TopNav'
 import { UploadPanel } from '@/components/dashboard/UploadPanel'
 import { SummaryCards } from '@/components/dashboard/SummaryCards'
 import { ResultTabs } from '@/components/dashboard/ResultTabs'
+import { SkeletonSummaryCards, SkeletonResultTabs } from '@/components/dashboard/SkeletonLoaders'
 import { JsonDownloadButton } from '@/components/common/JsonDownloadButton'
 import { Button } from '@/components/ui/button'
 import { UploadCloud } from 'lucide-react'
@@ -16,6 +17,11 @@ interface DashboardProps {
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const { result, loading, analyze } = useAnalysis()
   const [showUpload, setShowUpload] = useState(false)
+
+  const handleAnalyze = async (files: AnalysisFiles) => {
+    setShowUpload(false) // Close upload panel
+    await analyze(files)
+  }
 
   return (
     <PageShell>
@@ -46,7 +52,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       {/* Results - full width */}
-      {result ? (
+      {loading ? (
+        <div id="results-panel" className="space-y-6">
+          <SkeletonSummaryCards />
+          <SkeletonResultTabs />
+        </div>
+      ) : result ? (
         <div id="results-panel" className="space-y-6">
           <SummaryCards data={result} />
           <ResultTabs data={result} />
@@ -68,7 +79,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       {/* Floating Upload Button + Panel */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
         {showUpload && (
-          <UploadPanel onSubmit={analyze} loading={loading} compact />
+          <UploadPanel onSubmit={handleAnalyze} loading={loading} compact />
         )}
         <Button
           onClick={() => setShowUpload((v) => !v)}

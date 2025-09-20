@@ -54,7 +54,7 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-slate-600 dark:text-slate-400">Top Product</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm font-bold text-orange-600 dark:text-orange-400">
+          <CardContent className="text-sm font-bold text-green-600 dark:text-green-400">
             {topSku.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
           </CardContent>
         </Card>
@@ -130,7 +130,7 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product (SKU)</TableHead>
-                    <TableHead className="text-right">Forecasted Demand</TableHead>
+                    <TableHead>Forecasted Demand</TableHead>
                     <TableHead>Confidence & Reasoning</TableHead>
                     <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
@@ -156,7 +156,7 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-lg">
+                        <TableCell className="text-left font-semibold text-lg">
                           {item.forecasted_demand.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-slate-600 dark:text-slate-400 max-w-xs">
@@ -192,7 +192,7 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                                   <span>📈</span>
                                   <span>Demand: {item.forecasted_demand.toLocaleString()} units</span>
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1"> 
                                   <span>🎯</span>
                                   <span>AI-Generated Forecast</span>
                                 </div>

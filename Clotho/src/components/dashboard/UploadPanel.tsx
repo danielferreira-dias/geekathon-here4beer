@@ -11,7 +11,7 @@ export function UploadPanel({ onSubmit, loading, compact = true }: { onSubmit: (
   const fileCount = Object.values(files).filter(Boolean).length
 
   return (
-    <Card className={compact ? 'shadow-sm border bg-white/70 dark:bg-slate-900/70' : 'shadow-lg border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm'}>
+    <Card className={compact ? 'shadow-sm border bg-white dark:bg-slate-900' : 'shadow-lg border-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm'}>
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
           <div className={compact ? 'flex items-center justify-center w-8 h-8 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg' : 'flex items-center justify-center w-10 h-10 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-xl'}>
