@@ -206,12 +206,49 @@ agent = create_react_agent(
     prompt="You are a helpful agent for food providers. Use the tools available (search by item, location, stock summary) to answer users completely."
 )
 
+def query_agent_multi(user_input: str, max_rounds: int = 5):
+    messages = [
+        SystemMessage(content="You are a helpful assistant that can use multiple tools if needed. \
+If the user asks several things, call as many tools as necessary and then return a full answer."),
+        HumanMessage(content=user_input)
+    ]
+
+    for _ in range(max_rounds):
+        result = llm_with_tools.invoke(messages)
+
+        # Se não há tool_calls, o modelo já respondeu
+        if not result.tool_calls:
+            return result.content
+
+        # Caso contrário, executa todas as tool_calls
+        for tc in result.tool_calls:
+            name, args, tool_call_id = tc["name"], tc.get("args", {}), tc["id"]
+
+            for t in tools:
+                if t.name == name:
+                    tool_output = t.invoke(args)
+                    print(f"Tool '{name}' invoked with args {args}, result: {tool_output}")
+
+                    # Acrescenta resultado ao histórico, ligado ao tool_call_id certo
+                    messages.append(
+                        ToolMessage(content=str(tool_output), tool_call_id=tool_call_id)
+                    )
+                    break
+
+        # Agora que já tens ToolMessages, volta ao modelo
+        final = llm_with_tools.invoke(messages)
+
+        # Se não pedir mais tools, devolve resposta final
+        if not final.tool_calls:
+            return final.content
+
+    return "I'm sorry, I couldn't complete your request within the allowed rounds."
+
 if __name__ == "__main__":
     ##user_query = "Can you show me all food providers in New York that sell chicken under $10?"
     ##response = query_agent(user_query)
 
     user_complex_query = "I need all the providers in California that sell steak and chicken, sorted by price. Also, list me the providers that eggs and the stock available." 
-    response = agent.invoke({"messages":[{"role":"user","content":f"Input: {user_complex_query}"}]})    
-    print(response)
+    print(query_agent_multi(user_complex_query), 5)
 
 
