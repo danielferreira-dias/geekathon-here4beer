@@ -19,7 +19,7 @@ export async function analyzeCsvs(files: {
   form.append("bill_of_materials", files.bom);
 
   try {
-    const baseURL = "http://3.90.109.68:8000";
+    const baseURL = "http://3.90.109.68";
     // const baseURL = 'http://localhost:8000'
 
     const res = await fetch(`${baseURL}/analyze`, {
