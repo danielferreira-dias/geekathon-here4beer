@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="60" fill="url(#backgroundGradient)" />
+  
+  <!-- Spinning Thread/Data Flow -->
+  <g transform="translate(60, 60)">
+    <!-- Central Hub -->
+    <circle cx="0" cy="0" r="8" fill="white" opacity="0.9" />
+    
+    <!-- Threading Lines - representing data flow -->
+    <path d="M -25 -15 Q -15 -25 0 -20 Q 15 -15 25 -25" 
+          stroke="white" 
+          stroke-width="2.5" 
+          fill="none" 
+          opacity="0.8" 
+          stroke-linecap="round" />
+    
+    <path d="M -30 0 Q -20 -10 0 -5 Q 20 0 30 -10" 
+          stroke="url(#threadGradient1)" 
+          stroke-width="2.5" 
+          fill="none" 
+          opacity="0.9" 
+          stroke-linecap="round" />
+    
+    <path d="M -25 15 Q -15 25 0 20 Q 15 15 25 25" 
+          stroke="url(#threadGradient2)" 
+          stroke-width="2.5" 
+          fill="none" 
+          opacity="0.8" 
+          stroke-linecap="round" />
+    
+    <!-- Data Points - representing the different data sources -->
+    <circle cx="-28" cy="-18" r="3" fill="white" opacity="0.9" />
+    <circle cx="28" cy="-28" r="3" fill="white" opacity="0.9" />
+    <circle cx="-32" cy="2" r="3" fill="white" opacity="0.9" />
+    <circle cx="32" cy="-8" r="3" fill="white" opacity="0.9" />
+    <circle cx="-28" cy="18" r="3" fill="white" opacity="0.9" />
+    <circle cx="28" cy="28" r="3" fill="white" opacity="0.9" />
+    
+    <!-- Subtle geometric pattern overlay -->
+    <g opacity="0.3">
+      <path d="M -15 -15 L 15 15 M 15 -15 L -15 15" 
+            stroke="white" 
+            stroke-width="1" 
+            opacity="0.4" />
+    </g>
+  </g>
+  
+  <!-- Gradient Definitions -->
+  <defs>
+    <!-- Main background gradient using app's blue scheme -->
+    <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1D4ED8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Thread gradients for depth -->
+    <linearGradient id="threadGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#60A5FA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DBEAFE;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="threadGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#DBEAFE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60A5FA;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>
