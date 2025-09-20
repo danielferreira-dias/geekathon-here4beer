@@ -1,26 +1,173 @@
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import type { RiskItem } from '@/types/analysis'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { RiskAlertItem } from '@/types/analysis'
 
-export function RiskAlerts({ items }: { items: RiskItem[] }) {
-  const severityColor: Record<RiskItem['severity'], string> = {
-    low: 'bg-emerald-500',
-    medium: 'bg-amber-500',
-    high: 'bg-red-600',
+export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
+  const typeConfig: Record<RiskAlertItem['alert_type'], {
+    color: string
+    bgColor: string
+    icon: string
+    textColor: string
+    severity: 'high' | 'medium' | 'low'
+  }> = {
+    expiry: { 
+      color: 'bg-red-500', 
+      bgColor: 'bg-red-50 dark:bg-red-950/20', 
+      icon: '⏰',
+      textColor: 'text-red-800 dark:text-red-200',
+      severity: 'high'
+    },
+    stockout: { 
+      color: 'bg-red-500', 
+      bgColor: 'bg-red-50 dark:bg-red-950/20', 
+      icon: '📉',
+      textColor: 'text-red-800 dark:text-red-200',
+      severity: 'high'
+    },
+    shortage: { 
+      color: 'bg-orange-500', 
+      bgColor: 'bg-orange-50 dark:bg-orange-950/20', 
+      icon: '📊',
+      textColor: 'text-orange-800 dark:text-orange-200',
+      severity: 'medium'
+    },
+    overstock: { 
+      color: 'bg-green-500', 
+      bgColor: 'bg-green-50 dark:bg-green-950/20', 
+      icon: '📈',
+      textColor: 'text-green-800 dark:text-green-200',
+      severity: 'low'
+    },
+    other: { 
+      color: 'bg-slate-500', 
+      bgColor: 'bg-slate-50 dark:bg-slate-950/20', 
+      icon: '❓',
+      textColor: 'text-slate-800 dark:text-slate-200',
+      severity: 'medium'
+    }
   }
+
+  // Group risks by severity (derived from type)
+  const groupedRisks = items.reduce((acc, risk) => {
+    const severity = typeConfig[risk.alert_type].severity
+    if (!acc[severity]) acc[severity] = []
+    acc[severity].push(risk)
+    return acc
+  }, {} as Record<'high' | 'medium' | 'low', RiskAlertItem[]>)
+
+  const riskStats = {
+    total: items.length,
+    high: items.filter(r => typeConfig[r.alert_type].severity === 'high').length,
+    medium: items.filter(r => typeConfig[r.alert_type].severity === 'medium').length,
+    low: items.filter(r => typeConfig[r.alert_type].severity === 'low').length,
+  }
+
+  if (items.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <div className="text-6xl mb-4">✅</div>
+          <h3 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-2">
+            All Clear!
+          </h3>
+          <p className="text-slate-600 dark:text-slate-400 text-center">
+            No risks detected in your current analysis. Everything looks good to proceed.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
-    <div className="space-y-2">
-      {items.map((r, i) => (
-        <Alert key={i}>
-          <AlertTitle className="flex items-center gap-2">
-            <span className={`inline-block h-2.5 w-2.5 rounded-full ${severityColor[r.severity]}`} />
-            {r.type} – <Badge variant="secondary">{r.severity}</Badge>
-          </AlertTitle>
-          <AlertDescription>
-            {r.skuOrMaterial}: {r.message}
-          </AlertDescription>
-        </Alert>
-      ))}
+    <div className="space-y-6">
+      {/* Risk Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-slate-600 dark:text-slate-400">Total Risks</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-bold">
+            {riskStats.total}
+          </CardContent>
+        </Card>
+        <Card className="border-red-200 dark:border-red-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-red-600 dark:text-red-400">High Priority</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-bold text-red-600 dark:text-red-400">
+            {riskStats.high}
+          </CardContent>
+        </Card>
+        <Card className="border-orange-200 dark:border-orange-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-orange-600 dark:text-orange-400">Medium</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+            {riskStats.medium}
+          </CardContent>
+        </Card>
+        <Card className="border-green-200 dark:border-green-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-green-600 dark:text-green-400">Low Priority</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-bold text-green-600 dark:text-green-400">
+            {riskStats.low}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Risk Details by Severity */}
+      {(['high', 'medium', 'low'] as const).map(severity => {
+        const risks = groupedRisks[severity]
+        if (!risks || risks.length === 0) return null
+
+        const severityIcon = severity === 'high' ? '🚨' : severity === 'medium' ? '⚠️' : '✅'
+        
+        return (
+          <Card key={severity} className={`border-l-4 border-l-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-500`}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <span className="text-2xl">{severityIcon}</span>
+                <span className="capitalize">{severity} Priority Risks</span>
+                <Badge variant="secondary">{risks.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {risks.map((risk, i) => {
+                  const config = typeConfig[risk.alert_type]
+                  
+                  return (
+                    <div 
+                      key={i}
+                      className={`p-4 rounded-lg border ${config.bgColor} border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-200 dark:border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-800`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl flex-shrink-0 mt-0.5">
+                          {config.icon}
+                        </span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className={`font-semibold ${config.textColor}`}>
+                              {risk.alert_type.charAt(0).toUpperCase() + risk.alert_type.slice(1)} Alert
+                            </h4>
+                            <Badge variant="outline" className="text-xs">
+                              {risk.sku_or_material.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </Badge>
+                          </div>
+                          <p className={`text-sm ${config.textColor} opacity-90`}>
+                            {risk.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }
