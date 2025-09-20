@@ -19,10 +19,9 @@ export async function analyzeCsvs(files: {
   form.append("bill_of_materials", files.bom);
 
   try {
-    const baseURL = "http://3.90.109.68";
-    // const baseURL = 'http://localhost:8000'
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-    const res = await fetch(`${baseURL}/analyze`, {
+    const res = await fetch(`${apiUrl}/analyze`, {
       method: "POST",
       body: form,
     });
