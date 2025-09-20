@@ -6,12 +6,16 @@ import { SummaryCards } from '@/components/dashboard/SummaryCards'
 import { ResultTabs } from '@/components/dashboard/ResultTabs'
 import { JsonDownloadButton } from '@/components/common/JsonDownloadButton'
 
-export default function Dashboard() {
+interface DashboardProps {
+  onNavigate: (page: 'dashboard' | 'chatbot') => void
+}
+
+export default function Dashboard({ onNavigate }: DashboardProps) {
   const { result, loading, analyze } = useAnalysis()
 
   return (
     <PageShell>
-      <TopNav />
+      <TopNav currentPage="dashboard" onNavigate={onNavigate} />
       
       {/* Hero Section */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 dark:from-slate-800/20 dark:via-slate-700/20 dark:to-slate-600/20 px-8 py-12 mb-8">
