@@ -1,5 +1,11 @@
 import type { AnalysisResult } from "../types/analysis";
 
+export interface ApiError extends Error {
+  status?: number;
+  statusText?: string;
+  details?: string;
+}
+
 export async function analyzeCsvs(files: {
   sales: File;
   inventory: File;
@@ -12,7 +18,55 @@ export async function analyzeCsvs(files: {
   form.append("materials", files.materials);
   form.append("bom", files.bom);
 
-  const res = await fetch("/api/analyze", { method: "POST", body: form });
-  if (!res.ok) throw new Error(await res.text().catch(() => "Request failed"));
-  return res.json();
+  try {
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      body: form,
+      headers: {
+        // Don't set Content-Type for FormData, let the browser set it with boundary
+      },
+    });
+
+    if (!res.ok) {
+      let errorMessage = `HTTP ${res.status}`;
+      let details = "";
+
+      try {
+        // Try to get error details from response
+        const errorText = await res.text();
+        if (errorText) {
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorJson.error || errorMessage;
+            details = errorJson.details || errorJson.description || "";
+          } catch {
+            // If not JSON, use the text as is
+            errorMessage = errorText || errorMessage;
+          }
+        }
+      } catch {
+        // Fallback to generic message
+        errorMessage = `HTTP ${res.status} ${res.statusText}`;
+      }
+
+      const error = new Error(errorMessage) as ApiError;
+      error.status = res.status;
+      error.statusText = res.statusText;
+      error.details = details;
+      throw error;
+    }
+
+    const result = await res.json();
+    return result;
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      // Network error
+      const networkError = new Error(
+        "Network error - please check your connection"
+      ) as ApiError;
+      networkError.status = 0;
+      throw networkError;
+    }
+    throw error;
+  }
 }
