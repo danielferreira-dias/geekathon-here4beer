@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 from typing import Dict, Any, List, Set, Optional
+from collections import OrderedDict, deque
 
 import boto3
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -27,9 +28,46 @@ def _model_id() -> Optional[str]:
 router = APIRouter(tags=["chat"])
 
 
+# ---- Lightweight in-memory conversation history ----
+class ConversationMemory:
+    def __init__(self, max_conversations: int = 200, max_turns: int = 12):
+        self.max_conversations = max_conversations
+        self.max_turns = max_turns
+        self._store: OrderedDict[str, deque] = OrderedDict()
+
+    def get(self, conv_id: Optional[str]) -> List[Dict[str, Any]]:
+        if not conv_id:
+            return []
+        if conv_id in self._store:
+            # move to end (LRU)
+            self._store.move_to_end(conv_id)
+            return list(self._store[conv_id])
+        return []
+
+    def append(self, conv_id: Optional[str], role: str, text: str) -> None:
+        if not conv_id:
+            return
+        dq = self._store.get(conv_id)
+        if dq is None:
+            dq = deque(maxlen=self.max_turns * 2)  # user+assistant per turn
+            self._store[conv_id] = dq
+        dq.append({"role": role, "content": [{"text": text}]})
+        # Enforce LRU size
+        while len(self._store) > self.max_conversations:
+            self._store.popitem(last=False)
+
+    def clear(self, conv_id: Optional[str]) -> None:
+        if conv_id and conv_id in self._store:
+            del self._store[conv_id]
+
+
+_memory = ConversationMemory()
+
+
 class ChatRequest(BaseModel):
     question: str
     run_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 def _schema_from_metadata() -> tuple[str, List[str], Dict[str, Set[str]]]:
@@ -191,6 +229,10 @@ async def chat(req: ChatRequest):
             yield "Bedrock not configured. Please set BEDROCK_MODEL_ID."
             return
 
+        # Prepare conversation history (natural language only)
+        conv_id = req.conversation_id
+        history_msgs = _memory.get(conv_id)
+
         # Generate SQL query with Bedrock
         system_prompt = (
             "Convert the user’s question into a SINGLE safe SQL SELECT query against the schema below. "
@@ -217,7 +259,7 @@ async def chat(req: ChatRequest):
             payload = {
                 "modelId": _model_id(),
                 "system": [{"text": system_prompt}],
-                "messages": [{"role": "user", "content": [{"text": user_prompt}]}],
+                "messages": [*history_msgs, {"role": "user", "content": [{"text": user_prompt}]}],
                 "inferenceConfig": {"maxTokens": 400, "temperature": 0.0, "topP": 1.0},
             }
             resp = br.converse(**payload)
@@ -243,16 +285,35 @@ async def chat(req: ChatRequest):
             yield f"SQL execution error: {e}"
             return
 
-        # Explain with streaming
+        # Explain with streaming (do not store rows in memory)
         explain_user = (
-            "Explain these results in plain English for a supply chain planner. Be concise and clear.\n"
+            "Explain these results in plain English for a supply chain planner. Be concise and clear. "
+            "You may rely on the prior conversation for context if relevant.\n\n"
+            f"User question (may be a follow-up): {req.question}\n\n"
             + json.dumps(rows)[:6000]
         )
+        assistant_chunks: List[str] = []
         try:
-            async for chunk in _stream_bedrock_explanation(br, model_id=_model_id(), explain_text=explain_user):
+            async for chunk in _stream_bedrock_explanation(
+                br,
+                model_id=_model_id(),
+                explain_text=explain_user,
+                history_msgs=history_msgs,
+            ):
+                assistant_chunks.append(chunk)
                 yield chunk
         except Exception as e:
             yield f"Streaming failed: {e}"
+            return
+        # Save this turn to memory (question + assistant explanation)
+        try:
+            if conv_id:
+                _memory.append(conv_id, "user", req.question)
+                final_text = "".join(assistant_chunks)
+                _memory.append(conv_id, "assistant", final_text)
+        except Exception:
+            # Never fail the request due to memory bookkeeping
+            pass
 
     return StreamingResponse(
         gen(),
@@ -273,6 +334,7 @@ async def chat_ws(ws: WebSocket):
         init = await ws.receive_json()
         question: str = init.get("question")
         run_id: Optional[str] = init.get("run_id")
+        conv_id: Optional[str] = init.get("conversation_id")
         if not question:
             await ws.send_text(json.dumps({"error": "question is required"}))
             await ws.close()
@@ -294,7 +356,9 @@ async def chat_ws(ws: WebSocket):
             await ws.close()
             return
 
-        messages = [{"role": "user", "content": [{"text": f"Question: {question}\nRunId: {run_id}"}]}]
+        # Seed with prior conversation history if provided
+        history_msgs = _memory.get(conv_id)
+        messages = [*history_msgs, {"role": "user", "content": [{"text": f"Question: {question}\nRunId: {run_id}"}]}]
 
         for _ in range(6):
             payload = {
@@ -311,9 +375,18 @@ async def chat_ws(ws: WebSocket):
             text_parts = [c.get("text") for c in content if "text" in c]
 
             if not tool_calls:
-                for token in ("".join(text_parts)).split():
+                final_text = "".join([t for t in text_parts if t])
+                # Stream tokens to client
+                for token in final_text.split():
                     await ws.send_text(token + " ")
                 await ws.send_text("\n[END]")
+                # Persist this turn
+                try:
+                    if conv_id:
+                        _memory.append(conv_id, "user", question)
+                        _memory.append(conv_id, "assistant", final_text)
+                except Exception:
+                    pass
                 await ws.close()
                 return
 
@@ -337,12 +410,16 @@ async def chat_ws(ws: WebSocket):
 
 
 # Streaming helpers
-async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text: str):
+async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text: str, history_msgs: Optional[List[Dict[str, Any]]] = None):
     if not model_id:
         raise RuntimeError("BEDROCK_MODEL_ID is not set")
+    msgs = []
+    if history_msgs:
+        msgs.extend(history_msgs)
+    msgs.append({"role": "user", "content": [{"text": explain_text}]})
     payload = {
         "modelId": model_id,
-        "messages": [{"role": "user", "content": [{"text": explain_text}]}],
+        "messages": msgs,
         "inferenceConfig": {"maxTokens": 600, "temperature": 0.2, "topP": 0.9},
     }
     try:
@@ -367,9 +444,14 @@ async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text:
         return
 
     # Fallback: non-streaming response, chunk manually
+    # Build messages with history for fallback as well
+    msgs2 = []
+    if history_msgs:
+        msgs2.extend(history_msgs)
+    msgs2.append({"role": "user", "content": [{"text": explain_text}]})
     resp2 = br.converse(
         modelId=model_id,
-        messages=[{"role": "user", "content": [{"text": explain_text}]}],
+        messages=msgs2,
         inferenceConfig={"maxTokens": 600, "temperature": 0.2, "topP": 0.9},
     )
     content = resp2.get("output", {}).get("message", {}).get("content", [])
