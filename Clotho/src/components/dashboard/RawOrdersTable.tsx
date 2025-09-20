@@ -82,7 +82,7 @@ export function RawOrdersTable({ rows }: { rows: RawMaterialOrderItem[] }) {
 
               return (
                 <AccordionItem key={materialType} value={materialType}>
-                  <AccordionTrigger className="hover:no-underline">
+                  <AccordionTrigger className="hover:no-underline !bg-white dark:!bg-slate-900 !text-slate-900 dark:!text-slate-100 border border-slate-200 dark:border-slate-800 rounded-md">
                     <div className="flex items-center justify-between w-full pr-4">
                       <div className="flex items-center gap-3">
                         <span className="text-lg">{typeIcon}</span>
@@ -171,7 +171,7 @@ export function RawOrdersTable({ rows }: { rows: RawMaterialOrderItem[] }) {
                                         Order Now
                                       </Badge>
                                     ) : hasEnoughStock ? (
-                                      <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200">
+                                      <Badge variant="success" className="text-xs">
                                         Sufficient
                                       </Badge>
                                     ) : (

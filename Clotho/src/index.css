@@ -7,6 +7,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Accordion theme overrides */
+[data-radix-accordion-trigger] {
+  color: rgb(15 23 42) !important; /* slate-900 for light theme */
+}
+
+.dark [data-radix-accordion-trigger] {
+  color: rgb(248 250 252) !important; /* slate-100 for dark theme */
+}
+
+[data-radix-accordion-trigger]:hover {
+  color: rgb(51 65 85) !important; /* slate-700 for light theme hover */
+}
+
+.dark [data-radix-accordion-trigger]:hover {
+  color: rgb(203 213 225) !important; /* slate-300 for dark theme hover */
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { ForecastItem } from '@/types/analysis'
 
 export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
@@ -66,6 +66,10 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
           variant={viewMode === 'table' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setViewMode('table')}
+          className={viewMode === 'table' ? 
+            '!bg-teal-600 hover:!bg-teal-700 !text-white dark:!bg-teal-500 dark:hover:!bg-teal-600 dark:!text-white !border-teal-600 dark:!border-teal-500' : 
+            '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
+          }
         >
           📊 Table View
         </Button>
@@ -73,6 +77,10 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
           variant={viewMode === 'chart' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setViewMode('chart')}
+          className={viewMode === 'chart' ? 
+            '!bg-teal-600 hover:!bg-teal-700 !text-white dark:!bg-teal-500 dark:hover:!bg-teal-600 dark:!text-white !border-teal-600 dark:!border-teal-500' : 
+            '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
+          }
         >
           📈 Chart View
         </Button>
@@ -86,17 +94,17 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
+                <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-                  <XAxis 
-                    dataKey="sku" 
+                  <XAxis
+                    dataKey="sku"
                     className="text-slate-600 dark:text-slate-400"
                     angle={-45}
                     textAnchor="end"
                     height={80}
                   />
                   <YAxis className="text-slate-600 dark:text-slate-400" />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
                       backgroundColor: 'rgb(248 250 252)',
                       border: '1px solid rgb(226 232 240)',
@@ -105,15 +113,8 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                     labelFormatter={(value) => `Product: ${value}`}
                     formatter={(value) => [value, 'Forecasted Demand']}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="demand" 
-                    stroke="rgb(59 130 246)" 
-                    strokeWidth={3}
-                    dot={{ fill: 'rgb(59 130 246)', strokeWidth: 2, r: 6 }}
-                    activeDot={{ r: 8, stroke: 'rgb(59 130 246)', strokeWidth: 2 }}
-                  />
-                </LineChart>
+                  <Bar dataKey="demand" fill="rgb(59 130 246)" radius={[4,4,0,0]} barSize={26} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -167,7 +168,11 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="!text-slate-600 dark:!text-slate-400 !bg-transparent hover:!bg-slate-100 dark:hover:!bg-slate-800 hover:!text-slate-900 dark:hover:!text-slate-100"
+                          >
                             {expandedSku === item.sku ? '🔽' : '▶️'}
                           </Button>
                         </TableCell>

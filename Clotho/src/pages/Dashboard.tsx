@@ -45,7 +45,7 @@ export default function Dashboard() {
         {/* Results Section */}
         <div className="lg:col-span-2">
           {result ? (
-            <div className="space-y-6">
+            <div id="results-panel" className="space-y-6">
               <SummaryCards data={result} />
               <ResultTabs data={result} />
             </div>

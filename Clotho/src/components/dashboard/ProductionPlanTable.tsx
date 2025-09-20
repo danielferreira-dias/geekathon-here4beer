@@ -71,6 +71,10 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
           variant={viewMode === 'table' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setViewMode('table')}
+          className={viewMode === 'table' ? 
+            '!bg-teal-600 hover:!bg-teal-700 !text-white dark:!bg-teal-500 dark:hover:!bg-teal-600 dark:!text-white !border-teal-600 dark:!border-teal-500' : 
+            '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
+          }
         >
           📊 Table View
         </Button>
@@ -78,6 +82,10 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
           variant={viewMode === 'chart' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setViewMode('chart')}
+          className={viewMode === 'chart' ? 
+            '!bg-teal-600 hover:!bg-teal-700 !text-white dark:!bg-teal-500 dark:hover:!bg-teal-600 dark:!text-white !border-teal-600 dark:!border-teal-500' : 
+            '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
+          }
         >
           📈 Chart View
         </Button>
@@ -137,8 +145,6 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
                   {rows.map((item) => {
                     const gap = item.forecasted_demand - item.current_inventory
                     const inventoryRatio = item.current_inventory / item.forecasted_demand
-                    const isOverstocked = inventoryRatio > 1
-                    const isUnderstocked = inventoryRatio < 0.3
 
                     return (
                       <TableRow key={item.sku} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
@@ -173,20 +179,12 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex flex-col items-center gap-1">
-                            {isOverstocked ? (
-                              <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200">
-                                Overstocked
-                              </Badge>
-                            ) : isUnderstocked ? (
-                              <Badge variant="destructive" className="text-xs">
-                                Critical Low
-                              </Badge>
-                            ) : gap > 0 ? (
-                              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200">
-                                Need {gap.toLocaleString()}
+                            {gap > 0 ? (
+                              <Badge variant="destructive" className="text-xs w-full text-center items-center justify-center">
+                                Insufficient
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="success" className="text-xs w-full text-center items-center justify-center">
                                 Sufficient
                               </Badge>
                             )}

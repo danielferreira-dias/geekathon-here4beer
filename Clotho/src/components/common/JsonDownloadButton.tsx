@@ -1,19 +1,23 @@
 import { Button } from '@/components/ui/button'
+import { generatePdfFromAnalysis } from '@/lib/pdf'
+import type { AnalysisResult } from '@/types/analysis'
 
 export function JsonDownloadButton({ data }: { data: unknown }) {
-  const handleDownload = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'clotho-analysis.json'
-    a.click()
-    URL.revokeObjectURL(url)
+  const handleDownloadPdf = async () => {
+    if (!data) return
+    await generatePdfFromAnalysis(data as AnalysisResult)
   }
   return (
-    <Button size="sm" variant="outline" onClick={handleDownload} disabled={!data}>
-      Download JSON
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button 
+        size="sm"
+        onClick={handleDownloadPdf}
+        disabled={!data}
+        className="!bg-teal-600 hover:!bg-teal-700 dark:!bg-teal-500 dark:hover:!bg-teal-600 !text-white"
+      >
+        Download PDF
+      </Button>
+    </div>
   )
 }
 

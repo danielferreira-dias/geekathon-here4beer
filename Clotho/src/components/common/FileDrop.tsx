@@ -103,7 +103,7 @@ export function FileDrop({ label, accept = '.csv', onFile, icon, description }: 
               {/* Remove button - appears on hover */}
               <button
                 onClick={handleRemoveFile}
-                className="absolute top-0 left-0 w-8 h-8 p-0 m-0 border-0 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-200 dark:hover:bg-red-900/50 z-10"
+                className="absolute top-0 left-0 w-8 h-8 p-0 m-0 border-0 !bg-red-100 dark:!bg-red-900/30 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:!bg-red-200 dark:hover:!bg-red-900/50 z-10"
                 title="Remove file"
                 type="button"
                 style={{ padding: 0, margin: 0, border: 'none', transition: 'all 0.2s ease-in-out' }}

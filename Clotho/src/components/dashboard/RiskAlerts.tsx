@@ -47,9 +47,9 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
     }
   }
 
-  // Group risks by severity (derived from type)
   const groupedRisks = items.reduce((acc, risk) => {
-    const severity = typeConfig[risk.alert_type].severity
+    const config = typeConfig[risk.alert_type];
+    const severity = config ? config.severity : 'medium';
     if (!acc[severity]) acc[severity] = []
     acc[severity].push(risk)
     return acc
@@ -57,9 +57,18 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
 
   const riskStats = {
     total: items.length,
-    high: items.filter(r => typeConfig[r.alert_type].severity === 'high').length,
-    medium: items.filter(r => typeConfig[r.alert_type].severity === 'medium').length,
-    low: items.filter(r => typeConfig[r.alert_type].severity === 'low').length,
+    high: items.filter(r => {
+      const config = typeConfig[r.alert_type];
+      return config ? config.severity === 'high' : false;
+    }).length,
+    medium: items.filter(r => {
+      const config = typeConfig[r.alert_type];
+      return config ? config.severity === 'medium' : true;
+    }).length,
+    low: items.filter(r => {
+      const config = typeConfig[r.alert_type];
+      return config ? config.severity === 'low' : false;
+    }).length,
   }
 
   if (items.length === 0) {
@@ -80,7 +89,6 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
 
   return (
     <div className="space-y-6">
-      {/* Risk Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -116,7 +124,6 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
         </Card>
       </div>
 
-      {/* Risk Details by Severity */}
       {(['high', 'medium', 'low'] as const).map(severity => {
         const risks = groupedRisks[severity]
         if (!risks || risks.length === 0) return null
@@ -135,7 +142,13 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
             <CardContent>
               <div className="space-y-3">
                 {risks.map((risk, i) => {
-                  const config = typeConfig[risk.alert_type]
+                  const config = typeConfig[risk.alert_type] || {
+                    color: 'bg-slate-500',
+                    bgColor: 'bg-slate-50 dark:bg-slate-950/20',
+                    icon: '❓',
+                    textColor: 'text-slate-800 dark:text-slate-200',
+                    severity: 'medium'
+                  };
                   
                   return (
                     <div 
@@ -152,7 +165,7 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
                               {risk.alert_type.charAt(0).toUpperCase() + risk.alert_type.slice(1)} Alert
                             </h4>
                             <Badge variant="outline" className="text-xs">
-                              {risk.sku_or_material.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              {risk.sku_or_material?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'}
                             </Badge>
                           </div>
                           <p className={`text-sm ${config.textColor} opacity-90`}>

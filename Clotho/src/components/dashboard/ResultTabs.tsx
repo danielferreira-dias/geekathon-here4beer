@@ -5,6 +5,7 @@ import { ForecastTable } from './ForecastTable'
 import { ProductionPlanTable } from './ProductionPlanTable'
 import { RawOrdersTable } from './RawOrdersTable'
 import { RiskAlerts } from './RiskAlerts'
+import { formatSummaryText } from '@/lib/format'
 
 export function ResultTabs({ data }: { data: AnalysisResult }) {
   return (
@@ -30,9 +31,12 @@ export function ResultTabs({ data }: { data: AnalysisResult }) {
           </CardHeader>
           <CardContent>
             <div className="prose dark:prose-invert max-w-none">
-              <div className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg border">
-                {data.summary_text}
-              </div>
+              <div 
+                className="text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg border"
+                dangerouslySetInnerHTML={{ 
+                  __html: formatSummaryText(data.summary_text).replace(/\n/g, '<br>')
+                }}
+              />
             </div>
           </CardContent>
         </Card>

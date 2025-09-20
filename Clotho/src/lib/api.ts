@@ -13,21 +13,18 @@ export async function analyzeCsvs(files: {
   bom: File;
 }): Promise<AnalysisResult> {
   const form = new FormData();
-  form.append("sales", files.sales);
+  form.append("sales_history", files.sales);
   form.append("inventory", files.inventory);
-  form.append("materials", files.materials);
-  form.append("bom", files.bom);
+  form.append("raw_materials", files.materials);
+  form.append("bill_of_materials", files.bom);
 
   try {
-    // Use VITE_API_URL environment variable, fallback to localhost for development
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    const apiUrl = import.meta.env.BASE_API_URL || "http://localhost:8000";
+    const fullUrl = `${apiUrl}/analyze`;
 
-    const res = await fetch(`${apiUrl}/analyze`, {
+    const res = await fetch(fullUrl, {
       method: "POST",
       body: form,
-      headers: {
-        // Don't set Content-Type for FormData, let the browser set it with boundary
-      },
     });
 
     if (!res.ok) {
@@ -35,7 +32,6 @@ export async function analyzeCsvs(files: {
       let details = "";
 
       try {
-        // Try to get error details from response
         const errorText = await res.text();
         if (errorText) {
           try {
@@ -43,12 +39,10 @@ export async function analyzeCsvs(files: {
             errorMessage = errorJson.message || errorJson.error || errorMessage;
             details = errorJson.details || errorJson.description || "";
           } catch {
-            // If not JSON, use the text as is
             errorMessage = errorText || errorMessage;
           }
         }
       } catch {
-        // Fallback to generic message
         errorMessage = `HTTP ${res.status} ${res.statusText}`;
       }
 
