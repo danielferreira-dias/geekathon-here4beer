@@ -20,7 +20,8 @@ BEDROCK_LATENCY = os.getenv("BEDROCK_LATENCY", "standard")
 class BedrockClient:
     def __init__(self, model_id: 'str | None' = None, region: 'str | None' = None):
         # Resolve model and region; require model id to be set
-        self.model_id = model_id or MODEL_ID
+        # Read BEDROCK_MODEL_ID from environment at initialization to avoid module import timing issues
+        self.model_id = model_id if model_id is not None else os.getenv("BEDROCK_MODEL_ID")
         self.region = region or AWS_REGION
         if not self.model_id:
             raise RuntimeError("BEDROCK_MODEL_ID is not set")
