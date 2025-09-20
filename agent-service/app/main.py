@@ -5,6 +5,7 @@ import json
 import sys
 import os
 from typing import AsyncGenerator
+from app.models.query_schema import QueryRequest, QueryResponse
 
 # Add the services directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'services'))
@@ -12,11 +13,7 @@ from agent_here4beer import query_with_memory
 
 app = FastAPI(title="Food Provider Agent API", version="1.0.0")
 
-class QueryRequest(BaseModel):
-    message: str
 
-class QueryResponse(BaseModel):
-    response: str
 
 @app.get("/")
 async def root():
@@ -76,6 +73,7 @@ async def query_agent_stream(request: QueryRequest):
             "Access-Control-Allow-Headers": "*",
         }
     )
+
 
 @app.get("/health")
 async def health_check():
