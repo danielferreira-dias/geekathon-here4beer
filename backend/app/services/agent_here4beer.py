@@ -5,6 +5,7 @@ from langchain_core.tools import BaseTool, tool
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_aws import ChatBedrock
 from dotenv import load_dotenv
+from langgraph.prebuilt import create_react_agent
 load_dotenv()
 
 # Add the parent directory to sys.path to import provider_queries
@@ -199,47 +200,18 @@ llm = ChatBedrock(
 # Liga as tools
 llm_with_tools = llm.bind_tools(tools)
 
-def query_agent(user_input: str):
-    messages = [
-        SystemMessage(content="You are a helpful assistant that can use tools to look up provider data."),
-        HumanMessage(content=user_input)
-    ]
-    # invoke modelo com as ferramentas ligadas
-    result = llm_with_tools.invoke(messages)
-
-    print("Agent result:", result.content)
-
-    # Verifica se há tool calls
-    if hasattr(result, "tool_calls") and result.tool_calls:
-        # pega a primeira chamada
-        tc = result.tool_calls[0]  # tc é um dict
-        
-        # usa como dict:
-        name = tc.get("name")
-        args = tc.get("args", {})
-        # id = tc.get("id")  # se precisares
-        
-        # escolhe ferramenta por nome
-        for t in tools:
-            if t.name == name:
-                # executa a ferramenta passando args
-                tool_message = t.invoke(args)  # Invoke recebe dict args
-                print(f"Tool '{name}' invoked with args {args}, result: {tool_message}")
-                # retoma conversa com modelo com mensagem da ferramenta
-                # (Assumindo que t.invoke devolve um ToolMessage)
-                messages.append(tool_message)
-                
-                follow = llm_with_tools.invoke(messages)
-                return follow.content
-
-    # se não houver tool_call
-    return result.content
+agent = create_react_agent(
+    model=llm,
+    tools=tools,
+    prompt="You are a helpful agent for food providers. Use the tools available (search by item, location, stock summary) to answer users completely."
+)
 
 if __name__ == "__main__":
     ##user_query = "Can you show me all food providers in New York that sell chicken under $10?"
     ##response = query_agent(user_query)
 
     user_complex_query = "I need all the providers in California that sell steak and chicken, sorted by price. Also, list me the providers that eggs and the stock available." 
-    complex_response = query_agent(user_complex_query)
+    response = agent.invoke({"messages":[{"role":"user","content":f"Input: {user_complex_query}"}]})    
+    print(response)
 
 
