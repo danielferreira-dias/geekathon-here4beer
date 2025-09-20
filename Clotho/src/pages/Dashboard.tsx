@@ -28,19 +28,19 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       <TopNav currentPage="dashboard" onNavigate={onNavigate} />
       
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 dark:from-slate-800/20 dark:via-slate-700/20 dark:to-slate-600/20 px-8 py-12 mb-8">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 dark:from-slate-800/20 dark:via-slate-700/20 dark:to-slate-600/20 px-4 sm:px-6 lg:px-8 py-8 sm:py-12 mb-6 sm:mb-8">
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
         <div className="relative">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-teal-600 bg-clip-text text-transparent mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-cyan-600 via-blue-600 to-teal-600 bg-clip-text text-transparent mb-2">
                 Clotho Dashboard
               </h1>
-              <p className="text-lg text-slate-600 dark:text-slate-300 max-w-2xl">
+              <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 max-w-2xl">
                 Upload your CSV files, run intelligent analysis, and get actionable insights for your supply chain planning.
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center">
               {result && !loading && (
                 <div className="flex-shrink-0">
                   <JsonDownloadButton data={result} />
@@ -77,18 +77,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       )}
 
       {/* Floating Upload Button + Panel */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+      <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3">
         {showUpload && (
-          <UploadPanel onSubmit={handleAnalyze} loading={loading} compact />
+          <div className="w-80 sm:w-96 max-w-[calc(100vw-2rem)]">
+            <UploadPanel onSubmit={handleAnalyze} loading={loading} compact />
+          </div>
         )}
         <Button
           onClick={() => setShowUpload((v) => !v)}
           className={showUpload 
-            ? '!bg-teal-600 hover:!bg-teal-700 !text-white h-12 w-12 rounded-full'
-            : '!bg-white dark:!bg-slate-100/10 !text-slate-700 dark:!text-slate-200 h-12 w-12 rounded-full !border !border-slate-300 dark:!border-slate-600 hover:!bg-slate-100 dark:hover:!bg-slate-800'}
+            ? '!bg-teal-600 hover:!bg-teal-700 !text-white h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-lg'
+            : '!bg-white dark:!bg-slate-100/10 !text-slate-700 dark:!text-slate-200 h-12 w-12 sm:h-14 sm:w-14 rounded-full !border !border-slate-300 dark:!border-slate-600 hover:!bg-slate-100 dark:hover:!bg-slate-800 shadow-lg'}
           aria-label="Upload data"
         >
-          <UploadCloud className="w-5 h-5" />
+          <UploadCloud className="w-5 h-5 sm:w-6 sm:h-6" />
         </Button>
       </div>
     </PageShell>

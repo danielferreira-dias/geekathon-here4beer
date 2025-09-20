@@ -45,19 +45,26 @@ export function SummaryCards({ data }: { data: AnalysisResult }) {
   ]
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       {items.map((item) => (
         <Card key={item.title} className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
           <div className={`absolute inset-0 bg-gradient-to-br ${item.color} opacity-5 group-hover:opacity-10 transition-opacity`}></div>
-          <CardHeader className="pb-3 relative">
+          <CardHeader className="pb-2 sm:pb-3 relative">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="">{item.icon}</div>
-                <div>
-                  <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="flex-shrink-0">
+                  <TrendingUp className={item.title === 'Forecasted Demand' ? "w-5 h-5 sm:w-6 sm:h-6 text-blue-600" : "hidden"} />
+                  <Factory className={item.title === 'Production Plan' ? "w-5 h-5 sm:w-6 sm:h-6 text-teal-600" : "hidden"} />
+                  <Package className={item.title === 'Material Orders' ? "w-5 h-5 sm:w-6 sm:h-6 text-orange-600" : "hidden"} />
+                  {item.title === 'Risk Alerts' && (
+                    highRisks > 0 ? <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" /> : <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 truncate">
                     {item.title}
                   </CardTitle>
-                  <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-500 mt-1 truncate">
                     {item.description}
                   </p>
                 </div>
@@ -65,7 +72,7 @@ export function SummaryCards({ data }: { data: AnalysisResult }) {
             </div>
           </CardHeader>
           <CardContent className="pt-0 relative">
-            <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 dark:text-slate-100 break-words">
               {item.value}
             </div>
           </CardContent>

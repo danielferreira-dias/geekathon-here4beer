@@ -31,66 +31,68 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600 dark:text-slate-400">Total Demand</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">Total Demand</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+          <CardContent className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
             {totalDemand.toLocaleString()}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600 dark:text-slate-400">Current Inventory</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">Current Inventory</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <CardContent className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">
             {totalInventory.toLocaleString()}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600 dark:text-slate-400">To Produce</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">To Produce</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+          <CardContent className="text-lg sm:text-2xl font-bold text-orange-600 dark:text-orange-400">
             {totalProduction.toLocaleString()}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600 dark:text-slate-400">Products</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">Products</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+          <CardContent className="text-lg sm:text-2xl font-bold text-teal-600 dark:text-teal-400">
             {productCount}
           </CardContent>
         </Card>
       </div>
 
       {/* View Toggle */}
-      <div className="flex gap-2">
+      <div className="flex gap-1 sm:gap-2 w-full sm:w-auto">
         <Button 
           variant={viewMode === 'table' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setViewMode('table')}
-          className={viewMode === 'table' ? 
+          className={`flex-1 sm:flex-initial text-xs sm:text-sm px-2 sm:px-3 py-2 ${viewMode === 'table' ? 
             '!bg-teal-600 hover:!bg-teal-700 !text-white dark:!bg-teal-500 dark:hover:!bg-teal-600 dark:!text-white !border-teal-600 dark:!border-teal-500' : 
             '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
-          }
+          }`}
         >
-          <Table2 className="w-4 h-4 mr-1" />
-          Table View
+          <Table2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+          <span className="hidden sm:inline">Table View</span>
+          <span className="sm:hidden">Table</span>
         </Button>
         <Button 
           variant={viewMode === 'chart' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setViewMode('chart')}
-          className={viewMode === 'chart' ? 
+          className={`flex-1 sm:flex-initial text-xs sm:text-sm px-2 sm:px-3 py-2 ${viewMode === 'chart' ? 
             '!bg-teal-600 hover:!bg-teal-700 !text-white dark:!bg-teal-500 dark:hover:!bg-teal-600 dark:!text-white !border-teal-600 dark:!border-teal-500' : 
             '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
-          }
+          }`}
         >
-          <BarChart3 className="w-4 h-4 mr-1" />
-          Chart View
+          <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+          <span className="hidden sm:inline">Chart View</span>
+          <span className="sm:hidden">Chart</span>
         </Button>
       </div>
 
@@ -100,7 +102,7 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
             <CardTitle>Production Plan Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-96">
+            <div className="h-64 sm:h-80 lg:h-96">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
@@ -110,13 +112,16 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
                     angle={-45}
                     textAnchor="end"
                     height={80}
+                    fontSize={12}
+                    interval={0}
                   />
-                  <YAxis className="text-slate-600 dark:text-slate-400" />
+                  <YAxis className="text-slate-600 dark:text-slate-400" fontSize={12} />
                   <Tooltip 
                     contentStyle={{
                       backgroundColor: 'rgb(248 250 252)',
                       border: '1px solid rgb(226 232 240)',
-                      borderRadius: '0.5rem'
+                      borderRadius: '0.5rem',
+                      fontSize: '12px'
                     }}
                   />
                   <Bar dataKey="demand" fill="rgb(59 130 246)" name="Forecasted Demand" />
@@ -137,11 +142,11 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product (SKU)</TableHead>
-                    <TableHead className="text-right">Forecasted Demand</TableHead>
-                    <TableHead className="text-right">Current Inventory</TableHead>
-                    <TableHead className="text-right">Suggested Production</TableHead>
-                    <TableHead className="text-center">Gap Analysis</TableHead>
+                    <TableHead className="min-w-[200px] sm:min-w-[250px]">Product (SKU)</TableHead>
+                    <TableHead className="min-w-[120px] text-right">Forecasted Demand</TableHead>
+                    <TableHead className="min-w-[120px] text-right hidden sm:table-cell">Current Inventory</TableHead>
+                    <TableHead className="min-w-[120px] text-right">Suggested Production</TableHead>
+                    <TableHead className="min-w-[100px] text-center hidden lg:table-cell">Gap Analysis</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -152,42 +157,42 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
                     return (
                       <TableRow key={item.sku} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <Factory className="w-5 h-5 text-slate-500" />
-                            <div>
-                              <div className="font-semibold">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Factory className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-sm sm:text-base truncate">
                                 {item.sku.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                               </div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                              <div className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">
                                 {item.sku}
                               </div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-semibold text-sm sm:text-base">
                           {item.forecasted_demand.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <span className={inventoryRatio > 0.7 ? 'text-green-600 dark:text-green-400' : inventoryRatio > 0.3 ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400'}>
+                        <TableCell className="text-right hidden sm:table-cell">
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`font-medium text-sm ${inventoryRatio > 0.7 ? 'text-green-600 dark:text-green-400' : inventoryRatio > 0.3 ? 'text-orange-600 dark:text-orange-400' : 'text-red-600 dark:text-red-400'}`}>
                               {item.current_inventory.toLocaleString()}
                             </span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                               ({Math.round(inventoryRatio * 100)}%)
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-semibold text-orange-600 dark:text-orange-400">
+                        <TableCell className="text-right font-semibold text-orange-600 dark:text-orange-400 text-sm sm:text-base">
                           {item.suggested_production.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex flex-col items-center gap-1">
+                        <TableCell className="text-center hidden lg:table-cell">
+                          <div className="flex justify-center">
                             {gap > 0 ? (
-                              <Badge variant="destructive" className="text-xs w-full text-center items-center justify-center">
+                              <Badge variant="destructive" className="text-xs whitespace-nowrap">
                                 Insufficient
                               </Badge>
                             ) : (
-                              <Badge variant="success" className="text-xs w-full text-center items-center justify-center">
+                              <Badge variant="success" className="text-xs whitespace-nowrap">
                                 Sufficient
                               </Badge>
                             )}
@@ -206,7 +211,7 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
                 <ClipboardList className="w-4 h-4" />
                 Production Summary
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
                 <div>
                   <span className="text-slate-600 dark:text-slate-400">Total Production Needed:</span>
                   <div className="font-semibold text-orange-600 dark:text-orange-400">

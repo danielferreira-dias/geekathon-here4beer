@@ -90,36 +90,36 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-slate-600 dark:text-slate-400">Total Risks</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">Total Risks</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold">
+          <CardContent className="text-lg sm:text-2xl font-bold">
             {riskStats.total}
           </CardContent>
         </Card>
         <Card className="border-red-200 dark:border-red-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-red-600 dark:text-red-400">High Priority</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-red-600 dark:text-red-400">High Priority</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-red-600 dark:text-red-400">
+          <CardContent className="text-lg sm:text-2xl font-bold text-red-600 dark:text-red-400">
             {riskStats.high}
           </CardContent>
         </Card>
         <Card className="border-orange-200 dark:border-orange-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-orange-600 dark:text-orange-400">Medium</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-orange-600 dark:text-orange-400">Medium</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+          <CardContent className="text-lg sm:text-2xl font-bold text-orange-600 dark:text-orange-400">
             {riskStats.medium}
           </CardContent>
         </Card>
         <Card className="border-green-200 dark:border-green-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-green-600 dark:text-green-400">Low Priority</CardTitle>
+            <CardTitle className="text-xs sm:text-sm text-green-600 dark:text-green-400">Low Priority</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <CardContent className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">
             {riskStats.low}
           </CardContent>
         </Card>
@@ -134,10 +134,12 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
         return (
           <Card key={severity} className={`border-l-4 border-l-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-500`}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                {severityIcon}
-                <span className="capitalize">{severity} Priority Risks</span>
-                <Badge variant="secondary">{risks.length}</Badge>
+              <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {severityIcon}
+                  <span className="capitalize text-sm sm:text-base">{severity} Priority Risks</span>
+                </div>
+                <Badge variant="secondary" className="self-start sm:self-center">{risks.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -146,7 +148,7 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
                   const config = typeConfig[risk.alert_type] || {
                     color: 'bg-slate-500',
                     bgColor: 'bg-slate-50 dark:bg-slate-950/20',
-                    icon: <HelpCircle className="w-5 h-5 text-slate-600" />,
+                    icon: <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" />,
                     textColor: 'text-slate-800 dark:text-slate-200',
                     severity: 'medium'
                   };
@@ -154,22 +156,22 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
                   return (
                     <div 
                       key={i}
-                      className={`p-4 rounded-lg border ${config.bgColor} border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-200 dark:border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-800`}
+                      className={`p-3 sm:p-4 rounded-lg border ${config.bgColor} border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-200 dark:border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-800`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-shrink-0 mt-0.5">
                           {config.icon}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className={`font-semibold ${config.textColor}`}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                            <h4 className={`font-semibold text-sm sm:text-base ${config.textColor}`}>
                               {risk.alert_type.charAt(0).toUpperCase() + risk.alert_type.slice(1)} Alert
                             </h4>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs self-start">
                               {risk.sku_or_material?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'}
                             </Badge>
                           </div>
-                          <p className={`text-sm ${config.textColor} opacity-90`}>
+                          <p className={`text-xs sm:text-sm ${config.textColor} opacity-90 break-words`}>
                             {risk.description}
                           </p>
                         </div>

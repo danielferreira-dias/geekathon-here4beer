@@ -11,13 +11,25 @@ import { formatSummaryText } from '@/lib/format'
 export function ResultTabs({ data }: { data: AnalysisResult }) {
   return (
     <Tabs defaultValue="forecast" className="w-full">
-      <TabsList className="mb-3 w-full">
-        <TabsTrigger value="forecast">Forecast</TabsTrigger>
-        <TabsTrigger value="plan">Production Plan</TabsTrigger>
-        <TabsTrigger value="orders">Raw Orders</TabsTrigger>
-        <TabsTrigger value="risks">Risks</TabsTrigger>
-        <TabsTrigger value="summary">Summary</TabsTrigger>
-      </TabsList>
+      <div className="mb-3 overflow-x-auto">
+        <TabsList className="w-max min-w-full h-10 p-1 flex-nowrap">
+          <TabsTrigger value="forecast" className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap">
+            Forecast
+          </TabsTrigger>
+          <TabsTrigger value="plan" className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap">
+            Production Plan
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap">
+            Raw Orders
+          </TabsTrigger>
+          <TabsTrigger value="risks" className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap">
+            Risks
+          </TabsTrigger>
+          <TabsTrigger value="summary" className="flex-shrink-0 text-sm px-3 py-2 whitespace-nowrap">
+            Summary
+          </TabsTrigger>
+        </TabsList>
+      </div>
       <TabsContent value="forecast"><ForecastTable rows={data.forecast_table} /></TabsContent>
       <TabsContent value="plan"><ProductionPlanTable rows={data.production_plan} /></TabsContent>
       <TabsContent value="orders"><RawOrdersTable rows={data.raw_material_orders} /></TabsContent>
