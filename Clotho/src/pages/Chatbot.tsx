@@ -13,7 +13,7 @@ interface ChatbotProps {
 }
 
 export default function Chatbot({ onNavigate }: ChatbotProps) {
-  const { messages, isLoading, isStreaming, sendMessage, clearChat } = useChatbot()
+  const { messages, isLoading, sendMessage, clearChat } = useChatbot()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -128,7 +128,7 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
                 </div>
               ))}
 
-              {isLoading && !isStreaming && (
+              {isLoading && (
                 <div className="flex gap-3 justify-start">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center">
                     <Bot className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
