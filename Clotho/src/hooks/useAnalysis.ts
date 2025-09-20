@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { analyzeCsvs, type ApiError } from "@/lib/api";
+import { useCallback, useState, useEffect, useRef } from "react";
+import { analyzeCsvs, getExistingAnalysis, type ApiError } from "@/lib/api";
 import { showToast, handleApiError, handleApiSuccess } from "@/lib/toast";
 import { toast } from "sonner";
 import { useAnalysisContext } from "@/contexts/AnalysisContext";
@@ -20,6 +20,35 @@ export function useAnalysis() {
     resetConversationId,
   } = useAnalysisContext();
   const [error, setError] = useState<string | null>(null);
+  const hasAttemptedLoad = useRef(false);
+
+  // Fetch existing analysis on mount (only once)
+  useEffect(() => {
+    const loadExistingAnalysis = async () => {
+      // Prevent duplicate requests
+      if (hasAttemptedLoad.current || analysisData) {
+        return;
+      }
+
+      hasAttemptedLoad.current = true;
+
+      try {
+        console.log("Attempting to load existing analysis...");
+        const existingData = await getExistingAnalysis();
+        if (existingData) {
+          console.log("Loading existing analysis data");
+          setAnalysisData(existingData);
+        } else {
+          console.log("No existing analysis data found");
+        }
+      } catch (error) {
+        // Errors are already handled in getExistingAnalysis
+        console.warn("Failed to load existing analysis on mount:", error);
+      }
+    };
+
+    loadExistingAnalysis();
+  }, [analysisData, setAnalysisData]);
 
   const analyze = useCallback(
     async (files: AnalysisFiles) => {

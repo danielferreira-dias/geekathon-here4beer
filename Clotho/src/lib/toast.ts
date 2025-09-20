@@ -34,14 +34,15 @@ export const showToast = {
       action: options?.action,
       style: {
         background: "rgb(240 253 250)",
-        border: "1px solid rgb(134 239 172)",
-        color: "rgb(4 120 87)",
+        border: "1px solid rgb(34 197 94)",
+        color: "rgb(22 101 52)",
         borderRadius: "0.75rem",
         padding: "1rem",
         boxShadow:
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
-      className: "dark:!bg-teal-950 dark:!border-teal-800 dark:!text-teal-100",
+      className:
+        "dark:!bg-green-950 dark:!border-green-800 dark:!text-green-100 [&>[data-description]]:!text-black dark:[&>[data-description]]:!text-green-200",
     });
   },
 
@@ -52,14 +53,15 @@ export const showToast = {
       action: options?.action,
       style: {
         background: "rgb(254 242 242)",
-        border: "1px solid rgb(252 165 165)",
+        border: "1px solid rgb(239 68 68)",
         color: "rgb(127 29 29)",
         borderRadius: "0.75rem",
         padding: "1rem",
         boxShadow:
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
-      className: "dark:!bg-red-950 dark:!border-red-800 dark:!text-red-100",
+      className:
+        "dark:!bg-red-950 dark:!border-red-800 dark:!text-red-100 [&>[data-description]]:!text-red-700 dark:[&>[data-description]]:!text-red-200",
     });
   },
 
@@ -70,7 +72,7 @@ export const showToast = {
       action: options?.action,
       style: {
         background: "rgb(255 247 237)",
-        border: "1px solid rgb(251 191 36)",
+        border: "1px solid rgb(245 158 11)",
         color: "rgb(120 53 15)",
         borderRadius: "0.75rem",
         padding: "1rem",
@@ -78,7 +80,7 @@ export const showToast = {
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
       className:
-        "dark:!bg-orange-950 dark:!border-orange-800 dark:!text-orange-100",
+        "dark:!bg-amber-950 dark:!border-amber-800 dark:!text-amber-100 [&>[data-description]]:!text-amber-700 dark:[&>[data-description]]:!text-amber-200",
     });
   },
 
@@ -88,15 +90,16 @@ export const showToast = {
       description: options?.description,
       action: options?.action,
       style: {
-        background: "rgb(224 242 254)",
+        background: "rgb(239 246 255)",
         border: "1px solid rgb(59 130 246)",
-        color: "rgb(17 24 39)",
+        color: "rgb(30 58 138)",
         borderRadius: "0.75rem",
         padding: "1rem",
         boxShadow:
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
-      className: "dark:!bg-cyan-950 dark:!border-cyan-800 dark:!text-cyan-100",
+      className:
+        "dark:!bg-blue-950 dark:!border-blue-800 dark:!text-blue-100 [&>[data-description]]:!text-blue-800 dark:[&>[data-description]]:!text-blue-200",
     });
   },
 

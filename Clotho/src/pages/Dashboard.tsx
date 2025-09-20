@@ -41,7 +41,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {result && (
+              {result && !loading && (
                 <div className="flex-shrink-0">
                   <JsonDownloadButton data={result} />
                 </div>
