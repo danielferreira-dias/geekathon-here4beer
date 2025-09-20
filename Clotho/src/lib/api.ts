@@ -19,10 +19,10 @@ export async function analyzeCsvs(files: {
   form.append("bill_of_materials", files.bom);
 
   try {
-    const apiUrl = import.meta.env.BASE_API_URL || "http://localhost:8000";
-    const fullUrl = `${apiUrl}/analyze`;
+    const baseURL = "http://3.90.109.68:8000";
+    // const baseURL = 'http://localhost:8000'
 
-    const res = await fetch(fullUrl, {
+    const res = await fetch(`${baseURL}/analyze`, {
       method: "POST",
       body: form,
     });
