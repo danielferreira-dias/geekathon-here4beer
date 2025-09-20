@@ -52,7 +52,9 @@ function SkeletonSummary() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Executive Summary</CardTitle>
+        <CardTitle>
+          <Skeleton className="h-6 w-40" />
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <Skeleton className="h-4 w-full" />

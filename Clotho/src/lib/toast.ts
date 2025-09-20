@@ -41,8 +41,7 @@ export const showToast = {
         boxShadow:
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
-      className:
-        "dark:!bg-teal-950/50 dark:!border-teal-800 dark:!text-teal-100",
+      className: "dark:!bg-teal-950 dark:!border-teal-800 dark:!text-teal-100",
     });
   },
 
@@ -60,7 +59,7 @@ export const showToast = {
         boxShadow:
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
-      className: "dark:!bg-red-950/50 dark:!border-red-800 dark:!text-red-100",
+      className: "dark:!bg-red-950 dark:!border-red-800 dark:!text-red-100",
     });
   },
 
@@ -79,7 +78,7 @@ export const showToast = {
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
       className:
-        "dark:!bg-orange-950/50 dark:!border-orange-800 dark:!text-orange-100",
+        "dark:!bg-orange-950 dark:!border-orange-800 dark:!text-orange-100",
     });
   },
 
@@ -97,8 +96,7 @@ export const showToast = {
         boxShadow:
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
-      className:
-        "dark:!bg-cyan-950/50 dark:!border-cyan-800 dark:!text-cyan-100",
+      className: "dark:!bg-cyan-950 dark:!border-cyan-800 dark:!text-cyan-100",
     });
   },
 
@@ -114,7 +112,7 @@ export const showToast = {
           "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
       },
       className:
-        "dark:!bg-slate-950/50 dark:!border-slate-800 dark:!text-slate-100",
+        "dark:!bg-slate-950 dark:!border-slate-800 dark:!text-slate-100",
     });
   },
 };
