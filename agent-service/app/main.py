@@ -4,7 +4,7 @@ import sys
 import os
 import json
 import asyncio
-from models.query_schema import QueryRequest, QueryResponse
+from app.models.query_schema import QueryRequest, QueryResponse
 # Add the services directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'services'))
 from agent_here4beer import agent_instance
@@ -61,4 +61,6 @@ async def stream_agent_query(request: QueryRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True)
