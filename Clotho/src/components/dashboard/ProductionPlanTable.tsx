@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Table2, BarChart3, Factory, ClipboardList } from 'lucide-react'
 import type { ProductionPlanItem } from '@/types/analysis'
 
 export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
@@ -76,7 +77,8 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
             '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
           }
         >
-          📊 Table View
+          <Table2 className="w-4 h-4 mr-1" />
+          Table View
         </Button>
         <Button 
           variant={viewMode === 'chart' ? 'default' : 'outline'}
@@ -87,7 +89,8 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
             '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
           }
         >
-          📈 Chart View
+          <BarChart3 className="w-4 h-4 mr-1" />
+          Chart View
         </Button>
       </div>
 
@@ -150,7 +153,7 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
                       <TableRow key={item.sku} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
-                            <span className="text-lg">🏭</span>
+                            <Factory className="w-5 h-5 text-slate-500" />
                             <div>
                               <div className="font-semibold">
                                 {item.sku.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -200,7 +203,7 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
             {/* Production Summary */}
             <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
               <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                <span>📋</span>
+                <ClipboardList className="w-4 h-4" />
                 Production Summary
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">

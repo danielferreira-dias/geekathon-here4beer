@@ -1,47 +1,48 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Clock, TrendingDown, BarChart3, TrendingUp, HelpCircle, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react'
 import type { RiskAlertItem } from '@/types/analysis'
 
 export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
   const typeConfig: Record<RiskAlertItem['alert_type'], {
     color: string
     bgColor: string
-    icon: string
+    icon: React.ReactNode
     textColor: string
     severity: 'high' | 'medium' | 'low'
   }> = {
     expiry: { 
       color: 'bg-red-500', 
       bgColor: 'bg-red-50 dark:bg-red-950/20', 
-      icon: '⏰',
+      icon: <Clock className="w-5 h-5 text-red-600" />,
       textColor: 'text-red-800 dark:text-red-200',
       severity: 'high'
     },
     stockout: { 
       color: 'bg-red-500', 
       bgColor: 'bg-red-50 dark:bg-red-950/20', 
-      icon: '📉',
+      icon: <TrendingDown className="w-5 h-5 text-red-600" />,
       textColor: 'text-red-800 dark:text-red-200',
       severity: 'high'
     },
     shortage: { 
       color: 'bg-orange-500', 
       bgColor: 'bg-orange-50 dark:bg-orange-950/20', 
-      icon: '📊',
+      icon: <BarChart3 className="w-5 h-5 text-orange-600" />,
       textColor: 'text-orange-800 dark:text-orange-200',
       severity: 'medium'
     },
     overstock: { 
       color: 'bg-green-500', 
       bgColor: 'bg-green-50 dark:bg-green-950/20', 
-      icon: '📈',
+      icon: <TrendingUp className="w-5 h-5 text-green-600" />,
       textColor: 'text-green-800 dark:text-green-200',
       severity: 'low'
     },
     other: { 
       color: 'bg-slate-500', 
       bgColor: 'bg-slate-50 dark:bg-slate-950/20', 
-      icon: '❓',
+      icon: <HelpCircle className="w-5 h-5 text-slate-600" />,
       textColor: 'text-slate-800 dark:text-slate-200',
       severity: 'medium'
     }
@@ -75,7 +76,7 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
-          <div className="text-6xl mb-4">✅</div>
+          <CheckCircle className="w-16 h-16 text-green-600 mb-4" />
           <h3 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-2">
             All Clear!
           </h3>
@@ -128,13 +129,13 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
         const risks = groupedRisks[severity]
         if (!risks || risks.length === 0) return null
 
-        const severityIcon = severity === 'high' ? '🚨' : severity === 'medium' ? '⚠️' : '✅'
+        const severityIcon = severity === 'high' ? <AlertCircle className="w-6 h-6 text-red-600" /> : severity === 'medium' ? <AlertTriangle className="w-6 h-6 text-orange-600" /> : <CheckCircle className="w-6 h-6 text-green-600" />
         
         return (
           <Card key={severity} className={`border-l-4 border-l-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-500`}>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
-                <span className="text-2xl">{severityIcon}</span>
+                {severityIcon}
                 <span className="capitalize">{severity} Priority Risks</span>
                 <Badge variant="secondary">{risks.length}</Badge>
               </CardTitle>
@@ -145,7 +146,7 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
                   const config = typeConfig[risk.alert_type] || {
                     color: 'bg-slate-500',
                     bgColor: 'bg-slate-50 dark:bg-slate-950/20',
-                    icon: '❓',
+                    icon: <HelpCircle className="w-5 h-5 text-slate-600" />,
                     textColor: 'text-slate-800 dark:text-slate-200',
                     severity: 'medium'
                   };
@@ -156,9 +157,9 @@ export function RiskAlerts({ items }: { items: RiskAlertItem[] }) {
                       className={`p-4 rounded-lg border ${config.bgColor} border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-200 dark:border-${severity === 'high' ? 'red' : severity === 'medium' ? 'orange' : 'green'}-800`}
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-xl flex-shrink-0 mt-0.5">
+                        <div className="flex-shrink-0 mt-0.5">
                           {config.icon}
-                        </span>
+                        </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <h4 className={`font-semibold ${config.textColor}`}>

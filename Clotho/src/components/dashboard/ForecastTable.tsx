@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Table2, TrendingUp, Package, BarChart3, Target, ChevronDown, ChevronRight } from 'lucide-react'
 import type { ForecastItem } from '@/types/analysis'
 
 export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
@@ -71,7 +72,8 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
             '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
           }
         >
-          📊 Table View
+          <Table2 className="w-4 h-4 mr-1" />
+          Table View
         </Button>
         <Button 
           variant={viewMode === 'chart' ? 'default' : 'outline'}
@@ -82,7 +84,8 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
             '!border-slate-300 dark:!border-slate-600 !text-slate-700 dark:!text-slate-300 hover:!bg-slate-100 dark:hover:!bg-slate-800 !bg-transparent'
           }
         >
-          📈 Chart View
+          <BarChart3 className="w-4 h-4 mr-1" />
+          Chart View
         </Button>
       </div>
 
@@ -145,7 +148,7 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                       >
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
-                            <span className="text-lg">📦</span>
+                            <Package className="w-5 h-5 text-slate-500" />
                             <div>
                               <div className="font-semibold">
                                 {item.sku.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -173,7 +176,7 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                             size="sm"
                             className="!text-slate-600 dark:!text-slate-400 !bg-transparent hover:!bg-slate-100 dark:hover:!bg-slate-800 hover:!text-slate-900 dark:hover:!text-slate-100"
                           >
-                            {expandedSku === item.sku ? '🔽' : '▶️'}
+                            {expandedSku === item.sku ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -182,18 +185,19 @@ export function ForecastTable({ rows }: { rows: ForecastItem[] }) {
                           <TableCell colSpan={4} className="pl-12">
                             <div className="py-4">
                               <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                                📊 Detailed Analysis
+                                <BarChart3 className="w-4 h-4 inline mr-1" />
+                                Detailed Analysis
                               </h4>
                               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                                 {item.confidence_or_reason}
                               </p>
                               <div className="mt-3 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                                 <div className="flex items-center gap-1">
-                                  <span>📈</span>
+                                  <TrendingUp className="w-3 h-3" />
                                   <span>Demand: {item.forecasted_demand.toLocaleString()} units</span>
                                 </div>
                                 <div className="flex items-center gap-1"> 
-                                  <span>🎯</span>
+                                  <Target className="w-3 h-3" />
                                   <span>AI-Generated Forecast</span>
                                 </div>
                               </div>

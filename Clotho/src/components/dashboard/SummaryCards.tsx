@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { TrendingUp, Factory, Package, AlertTriangle, CheckCircle } from 'lucide-react'
 import type { AnalysisResult } from '@/types/analysis'
 
 export function SummaryCards({ data }: { data: AnalysisResult }) {
@@ -16,28 +17,28 @@ export function SummaryCards({ data }: { data: AnalysisResult }) {
     { 
       title: 'Forecasted Demand', 
       value: totalDemand.toLocaleString(), 
-      icon: '📈',
+      icon: <TrendingUp className="w-6 h-6 text-blue-600" />,
       description: 'Total units forecasted',
       color: 'from-blue-500 to-cyan-500'
     },
     { 
       title: 'Production Plan', 
       value: totalProduce.toLocaleString(), 
-      icon: '🏭',
+      icon: <Factory className="w-6 h-6 text-teal-600" />,
       description: 'Units to produce',
       color: 'from-teal-500 to-green-500'
     },
     { 
       title: 'Material Orders', 
       value: `${totalOrders.toLocaleString()} kg`, 
-      icon: '📦',
+      icon: <Package className="w-6 h-6 text-orange-600" />,
       description: 'Raw materials to order',
       color: 'from-orange-500 to-yellow-500'
     },
     { 
       title: 'Risk Alerts', 
       value: riskCount.toString(), 
-      icon: highRisks > 0 ? '⚠️' : '✅',
+      icon: highRisks > 0 ? <AlertTriangle className="w-6 h-6 text-red-600" /> : <CheckCircle className="w-6 h-6 text-green-600" />,
       description: highRisks > 0 ? `${highRisks} high priority` : 'All systems normal',
       color: highRisks > 0 ? 'from-red-500 to-pink-500' : 'from-green-500 to-emerald-500'
     },
@@ -51,7 +52,7 @@ export function SummaryCards({ data }: { data: AnalysisResult }) {
           <CardHeader className="pb-3 relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="text-2xl">{item.icon}</div>
+                <div className="">{item.icon}</div>
                 <div>
                   <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
                     {item.title}

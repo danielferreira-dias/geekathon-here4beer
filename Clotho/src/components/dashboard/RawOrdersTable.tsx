@@ -2,6 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Beef, Ham, Bird, Flame, Package } from 'lucide-react'
 import type { RawMaterialOrderItem } from '@/types/analysis'
 
 export function RawOrdersTable({ rows }: { rows: RawMaterialOrderItem[] }) {
@@ -73,19 +74,19 @@ export function RawOrdersTable({ rows }: { rows: RawMaterialOrderItem[] }) {
               const criticalCount = materials.filter(material => material.suggested_order_kg > 0).length
 
               const typeIcon = {
-                'Beef': '🥩',
-                'Pork': '🐷',
-                'Chicken': '🐔',
-                'Bbq': '🔥',
-                'Other': '📦'
-              }[materialType] || '📦'
+                'Beef': <Beef className="w-5 h-5 text-red-600" />,
+                'Pork': <Ham className="w-5 h-5 text-pink-600" />,
+                'Chicken': <Bird className="w-5 h-5 text-yellow-600" />,
+                'Bbq': <Flame className="w-5 h-5 text-orange-600" />,
+                'Other': <Package className="w-5 h-5 text-slate-500" />
+              }[materialType] || <Package className="w-5 h-5 text-slate-500" />
 
               return (
                 <AccordionItem key={materialType} value={materialType}>
                   <AccordionTrigger className="hover:no-underline !bg-white dark:!bg-slate-900 !text-slate-900 dark:!text-slate-100 border border-slate-200 dark:border-slate-800 rounded-md">
                     <div className="flex items-center justify-between w-full pr-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">{typeIcon}</span>
+                        {typeIcon}
                         <div className="text-left">
                           <div className="font-semibold">{materialType} Materials</div>
                           <div className="text-sm text-slate-500 dark:text-slate-400">
@@ -135,7 +136,7 @@ export function RawOrdersTable({ rows }: { rows: RawMaterialOrderItem[] }) {
                                 >
                                   <TableCell className="font-medium">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-sm">📦</span>
+                                      <Package className="w-4 h-4 text-slate-500" />
                                       <div>
                                         <div className="font-semibold">
                                           {material.material_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}

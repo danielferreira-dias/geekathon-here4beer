@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ClipboardList } from 'lucide-react'
 import type { AnalysisResult } from '@/types/analysis'
 import { ForecastTable } from './ForecastTable'
 import { ProductionPlanTable } from './ProductionPlanTable'
@@ -10,7 +11,7 @@ import { formatSummaryText } from '@/lib/format'
 export function ResultTabs({ data }: { data: AnalysisResult }) {
   return (
     <Tabs defaultValue="forecast" className="w-full">
-      <TabsList className="mb-3">
+      <TabsList className="mb-3 w-full">
         <TabsTrigger value="forecast">Forecast</TabsTrigger>
         <TabsTrigger value="plan">Production Plan</TabsTrigger>
         <TabsTrigger value="orders">Raw Orders</TabsTrigger>
@@ -25,7 +26,7 @@ export function ResultTabs({ data }: { data: AnalysisResult }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span className="text-xl">📋</span>
+              <ClipboardList className="w-5 h-5" />
               Executive Summary
             </CardTitle>
           </CardHeader>
