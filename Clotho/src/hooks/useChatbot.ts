@@ -14,8 +14,7 @@ export function useChatbot() {
     {
       id: "1",
       role: "assistant",
-      content:
-        "Hello! I'm your AI Forecasting and Planning Copilot for the meat factory. I can help you analyze sales data, create production plans, and provide supply chain insights. How can I assist you today?",
+      content: "Hello! How can I assist you today?",
       timestamp: new Date(),
     },
   ]);

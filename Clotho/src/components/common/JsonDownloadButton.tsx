@@ -15,7 +15,7 @@ export function JsonDownloadButton({ data }: { data: unknown }) {
         disabled={!data}
         className="!bg-teal-600 hover:!bg-teal-700 dark:!bg-teal-500 dark:hover:!bg-teal-600 !text-white"
       >
-        Download PDF
+        Download Report
       </Button>
     </div>
   )
