@@ -19,7 +19,10 @@ export async function analyzeCsvs(files: {
   form.append("bom", files.bom);
 
   try {
-    const res = await fetch("/api/analyze", {
+    // Use VITE_API_URL environment variable, fallback to localhost for development
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+    const res = await fetch(`${apiUrl}/analyze`, {
       method: "POST",
       body: form,
       headers: {
