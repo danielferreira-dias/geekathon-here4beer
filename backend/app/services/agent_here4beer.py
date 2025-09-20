@@ -1,5 +1,6 @@
 import sys
 import os
+from time import time
 from langchain_aws.chat_models.bedrock import ChatBedrock, ToolMessage # modelo de chat Bedrock
 from langchain_core.tools import BaseTool, tool
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -215,6 +216,9 @@ def query_agent_multi(user_input: str, max_rounds: int = 5):
     for _ in range(max_rounds):
         result = llm_with_tools.invoke(messages)
 
+        ## To remove rate limiting issues on Development
+        time.sleep(0.5)
+
         if not result.tool_calls:
             if not result.content.strip():
                 return "I'm sorry, I couldn't find an answer to your query."
@@ -242,7 +246,7 @@ if __name__ == "__main__":
     ##user_query = "Can you show me all food providers in New York that sell chicken under $10?"
     ##response = query_agent(user_query)
 
-    user_complex_query = "I need all the providers in California that sell steak and chicken, sorted by price. Also, list me the providers that eggs and the stock available." 
+    user_complex_query = "Get me the providers that sell eggs and I wish to write a follow up email to the provider with the cheapest eggs." 
     print(query_agent_multi(user_complex_query), 5)
 
 
