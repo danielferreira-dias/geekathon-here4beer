@@ -206,13 +206,16 @@ llm_with_tools = llm.bind_tools(tools)
 # Opção de store para memória
 from langchain_core.stores import InMemoryStore
 
+## Store Chat Conversations to keep context;
+store = InMemoryStore()
+
 # Cria o agente com React, usando o store
 agent = create_react_agent(
     model=llm,
     tools=tools,
+    store=store,
 )
 
-# no início do teu arquivo, define uma system message fixa
 SYSTEM_PROMPT = "You are a helpful agent for food providers. Use the tools available to answer users completely."
 
 # depois, histórico de mensagens
