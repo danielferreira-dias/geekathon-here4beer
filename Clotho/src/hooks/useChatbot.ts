@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useCallback } from "react";
 import { useAnalysisContext } from "@/contexts/AnalysisContext";
 
@@ -76,7 +75,8 @@ export function useChatbot() {
           const chunk = decoder.decode(value, { stream: true });
 
           // Handle plain text streaming - each chunk is part of the response
-          if (chunk) {
+          if (chunk && chunk.trim()) {
+            // Only process non-empty chunks
             // Create assistant message on first content if it doesn't exist
             if (!assistantMessageId) {
               assistantMessageId = (Date.now() + 1).toString();
@@ -88,7 +88,7 @@ export function useChatbot() {
               };
               setMessages((prev) => [...prev, assistantMessage]);
               setIsStreaming(true); // Mark as streaming started
-              setIsLoading(false); // Hide loading indicator once streaming starts
+              setIsLoading(false); // Hide loading indicator once we have actual text content
             } else {
               // Update existing assistant message with streaming content
               setMessages((prev) =>
@@ -135,7 +135,7 @@ export function useChatbot() {
         setIsStreaming(false);
       }
     },
-    [isLoading]
+    [isLoading, conversationId]
   );
 
   const clearChat = useCallback(() => {
