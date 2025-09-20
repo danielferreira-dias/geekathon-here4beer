@@ -1,0 +1,60 @@
+services:
+  # Production service using Node.js serve
+  clotho-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clotho-production
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Alternative: Vite preview mode
+  clotho-vite:
+    build:
+      context: .
+      dockerfile: Dockerfile.vite
+    container_name: clotho-vite
+    ports:
+      - "4173:4173"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    profiles:
+      - vite
+
+  # Development service
+  clotho-dev:
+    image: node:20-alpine
+    container_name: clotho-development
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    profiles:
+      - dev
+
+networks:
+  default:
+    name: clotho-network

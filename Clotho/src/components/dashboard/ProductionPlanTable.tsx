@@ -24,8 +24,8 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
     fullSku: item.sku
   })).sort((a, b) => b.demand - a.demand)
 
-  // Calculate production efficiency
-  const efficiencyRate = totalInventory > 0 ? Math.round((totalProduction / (totalDemand - totalInventory)) * 100) : 100
+  // Calculate production efficiency (currently unused, but available for future features)
+  // const efficiencyRate = totalInventory > 0 ? Math.round((totalProduction / (totalDemand - totalInventory)) * 100) : 100
 
   return (
     <div className="space-y-6">
@@ -134,7 +134,7 @@ export function ProductionPlanTable({ rows }: { rows: ProductionPlanItem[] }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((item, i) => {
+                  {rows.map((item) => {
                     const gap = item.forecasted_demand - item.current_inventory
                     const inventoryRatio = item.current_inventory / item.forecasted_demand
                     const isOverstocked = inventoryRatio > 1

@@ -57,8 +57,11 @@ export function useAnalysis() {
       handleApiSuccess("Analysis completed successfully!", "analyze your data");
 
       // Show warnings if any exist in the result
-      if (data.risks && data.risks.length > 0) {
-        const highRisks = data.risks.filter((risk) => risk.severity === "high");
+      if (data.risk_alerts && data.risk_alerts.length > 0) {
+        const highRisks = data.risk_alerts.filter(
+          (risk) =>
+            risk.alert_type === "expiry" || risk.alert_type === "stockout"
+        );
         if (highRisks.length > 0) {
           showToast.warning("High Risk Alerts Detected", {
             description: `Found ${highRisks.length} high priority risk(s) in your analysis`,
