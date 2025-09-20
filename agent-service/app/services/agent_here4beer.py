@@ -1,4 +1,4 @@
-from here4beer_agent import Here4BeerAgent
+from agent_class import Here4BeerAgent
 
 # Initialize the agent
 agent_instance = Here4BeerAgent()
