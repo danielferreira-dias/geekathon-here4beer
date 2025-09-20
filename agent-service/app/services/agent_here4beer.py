@@ -1,12 +1,14 @@
 import sys
 import os
-from time import time
+import time
 from langchain_aws.chat_models.bedrock import ChatBedrock, ToolMessage # modelo de chat Bedrock
-from langchain_core.tools import BaseTool, tool
+from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_aws import ChatBedrock
 from dotenv import load_dotenv
 from langgraph.prebuilt import create_react_agent
+from langchain.memory import ConversationSummaryMemory
+
 load_dotenv()
 
 # Add the parent directory to sys.path to import provider_queries
@@ -201,52 +203,54 @@ llm = ChatBedrock(
 # Liga as tools
 llm_with_tools = llm.bind_tools(tools)
 
+# Opção de store para memória
+from langchain_core.stores import InMemoryStore
+
+# Cria o agente com React, usando o store
 agent = create_react_agent(
     model=llm,
     tools=tools,
-    prompt="You are a helpful agent for food providers. Use the tools available (search by item, location, stock summary) to answer users completely."
 )
 
-def query_agent_multi(user_input: str, max_rounds: int = 5):
-    messages = [
-        SystemMessage(content="You are a helpful assistant that can use multiple tools if needed."),
-        HumanMessage(content=user_input)
-    ]
+# no início do teu arquivo, define uma system message fixa
+SYSTEM_PROMPT = "You are a helpful agent for food providers. Use the tools available to answer users completely."
 
-    for _ in range(max_rounds):
-        result = llm_with_tools.invoke(messages)
+# depois, histórico de mensagens
+history_messages = [
+    SystemMessage(content=SYSTEM_PROMPT)
+]
 
-        ## To remove rate limiting issues on Development
-        time.sleep(0.5)
-
-        if not result.tool_calls:
-            if not result.content.strip():
-                return "I'm sorry, I couldn't find an answer to your query."
-            return result.content
-
-        # Executa só os tool_calls deste result
-        tool_messages = []
-        for tc in result.tool_calls:
-            name, args, tool_call_id = tc["name"], tc.get("args", {}), tc["id"]
-            for t in tools:
-                if t.name == name:
-                    tool_output = t.invoke(args)
-                    print(f"Tool '{name}' invoked with args {args}, result: {tool_output}")
-                    tool_messages.append(
-                        ToolMessage(content=str(tool_output), tool_call_id=tool_call_id)
-                    )
-                    break
-
-        # Depois do AIMessage + ToolMessages dessa ronda, faz nova chamada
-        messages.extend([result] + tool_messages)
+def query_with_memory(user_input: str, max_rounds: int = 5):
+    # garante que a primeira mensagem é SystemMessage
+    if not isinstance(history_messages[0], SystemMessage):
+        history_messages.insert(0, SystemMessage(content=SYSTEM_PROMPT))
     
-    return "Maximum rounds reached without a final answer."
+    # adiciona a entrada do utilizador
+    history_messages.append(HumanMessage(content=user_input))
+
+    result = agent.invoke({"messages": history_messages})
+
+    # supõe que result["messages"] contem mensagens do histórico, incluindo SystemMessage como primeiro
+    out_messages = result.get("messages", [])
+    if out_messages:
+        # Verifica novamente que o primeiro é SystemMessage
+        if not isinstance(out_messages[0], SystemMessage):
+            # Corrige se necessário
+            out_messages.insert(0, SystemMessage(content=SYSTEM_PROMPT))
+        history_messages[:] = out_messages
+
+    # devolve a última mensagem de resposta
+    last = history_messages[-1]
+    return getattr(last, "content", str(last))
 
 if __name__ == "__main__":
-    ##user_query = "Can you show me all food providers in New York that sell chicken under $10?"
-    ##response = query_agent(user_query)
+    while True:
+        user_input = input("You: ")
+        if user_input.lower() in ["quit", "exit"]:
+            break
+        resp = query_with_memory(user_input)
+        print("Agent:", resp)
 
-    user_complex_query = "Get me the providers that sell eggs and I wish to write a follow up email to the provider with the cheapest eggs." 
-    print(query_agent_multi(user_complex_query), 5)
+        
 
 
