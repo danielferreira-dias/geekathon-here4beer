@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAnalysis } from '@/hooks/useAnalysis'
 import { PageShell } from '@/components/common/PageShell'
 import { TopNav } from '@/components/common/TopNav'
@@ -5,6 +6,8 @@ import { UploadPanel } from '@/components/dashboard/UploadPanel'
 import { SummaryCards } from '@/components/dashboard/SummaryCards'
 import { ResultTabs } from '@/components/dashboard/ResultTabs'
 import { JsonDownloadButton } from '@/components/common/JsonDownloadButton'
+import { Button } from '@/components/ui/button'
+import { UploadCloud } from 'lucide-react'
 
 interface DashboardProps {
   onNavigate: (page: 'dashboard' | 'chatbot') => void
@@ -12,6 +15,7 @@ interface DashboardProps {
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const { result, loading, analyze } = useAnalysis()
+  const [showUpload, setShowUpload] = useState(false)
 
   return (
     <PageShell>
@@ -30,43 +34,49 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 Upload your CSV files, run intelligent analysis, and get actionable insights for your supply chain planning.
               </p>
             </div>
-            {result && (
-              <div className="flex-shrink-0">
-                <JsonDownloadButton data={result} />
-              </div>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {result && (
+                <div className="flex-shrink-0">
+                  <JsonDownloadButton data={result} />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Upload Section */}
-        <div className="lg:col-span-1">
-          <UploadPanel onSubmit={analyze} loading={loading} />
+      {/* Results - full width */}
+      {result ? (
+        <div id="results-panel" className="space-y-6">
+          <SummaryCards data={result} />
+          <ResultTabs data={result} />
         </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-96 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/20">
+          <div className="text-center">
+            <svg className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No Analysis Yet</h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm">
+              Upload your CSV files and click "Analyze" to see detailed insights and recommendations.
+            </p>
+          </div>
+        </div>
+      )}
 
-        {/* Results Section */}
-        <div className="lg:col-span-2">
-          {result ? (
-            <div id="results-panel" className="space-y-6">
-              <SummaryCards data={result} />
-              <ResultTabs data={result} />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-96 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-800/20">
-              <div className="text-center">
-                <svg className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">No Analysis Yet</h3>
-                <p className="text-slate-500 dark:text-slate-400 max-w-sm">
-                  Upload your CSV files and click "Analyze" to see detailed insights and recommendations.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Floating Upload Button + Panel */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        {showUpload && (
+          <UploadPanel onSubmit={analyze} loading={loading} compact />
+        )}
+        <Button
+          onClick={() => setShowUpload((v) => !v)}
+          className={showUpload ? '!bg-teal-600 hover:!bg-teal-700 !text-white h-12 w-12 rounded-full' : '!bg-slate-900/90 dark:!bg-slate-100/10 !text-white dark:!text-slate-200 h-12 w-12 rounded-full border border-white/10 hover:!bg-slate-800'}
+          aria-label="Upload data"
+        >
+          <UploadCloud className="w-5 h-5" />
+        </Button>
       </div>
     </PageShell>
   )
