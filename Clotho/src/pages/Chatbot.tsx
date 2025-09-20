@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { marked } from 'marked'
 import { PageShell } from '@/components/common/PageShell'
 import { TopNav } from '@/components/common/TopNav'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,7 @@ interface ChatbotProps {
 }
 
 export default function Chatbot({ onNavigate }: ChatbotProps) {
-  const { messages, isLoading, sendMessage, clearChat } = useChatbot()
+  const { messages, isLoading, isStreaming, sendMessage, clearChat } = useChatbot()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -43,6 +44,16 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const parseMarkdown = (content: string) => {
+    // Configure marked for safe HTML output
+    marked.setOptions({
+      breaks: true, // Convert line breaks to <br>
+      gfm: true, // GitHub flavored markdown
+    })
+    
+    return marked(content)
   }
 
   return (
@@ -85,7 +96,7 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
                     </div>
                   )}
 
-                  <div className={`max-w-[80%] ${message.role === 'user' ? 'order-1' : ''}`}>
+                  <div className={`${message.role === 'user' ? 'max-w-[70%] order-1' : 'max-w-[85%]'}`}>
                     <div
                       className={`rounded-2xl px-4 py-3 ${
                         message.role === 'user'
@@ -93,7 +104,14 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.role === 'assistant' ? (
+                        <div 
+                          className="prose prose-sm max-w-none dark:prose-invert prose-headings:mt-3 prose-headings:mb-2 prose-p:my-1 prose-ul:my-2 prose-ol:my-2 prose-li:my-0"
+                          dangerouslySetInnerHTML={{ __html: parseMarkdown(message.content) }}
+                        />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      )}
                     </div>
                     <p className={`text-xs text-slate-500 dark:text-slate-400 mt-1 ${
                       message.role === 'user' ? 'text-right' : 'text-left'
@@ -110,7 +128,7 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
                 </div>
               ))}
 
-              {isLoading && (
+              {isLoading && !isStreaming && (
                 <div className="flex gap-3 justify-start">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center">
                     <Bot className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />

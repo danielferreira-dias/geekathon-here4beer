@@ -1,4 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useCallback } from "react";
+import { useAnalysisContext } from "@/contexts/AnalysisContext";
 
 export interface ChatMessage {
   id: string;
@@ -8,6 +10,7 @@ export interface ChatMessage {
 }
 
 export function useChatbot() {
+  const { conversationId, resetConversationId } = useAnalysisContext();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "1",
@@ -18,6 +21,7 @@ export function useChatbot() {
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -33,26 +37,12 @@ export function useChatbot() {
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
 
-      // Create a placeholder assistant message for streaming
-      const assistantMessageId = (Date.now() + 1).toString();
-      const assistantMessage: ChatMessage = {
-        id: assistantMessageId,
-        role: "assistant",
-        content: "",
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
+      // We'll create the assistant message only when we start receiving content
+      let assistantMessageId: string | null = null;
 
       try {
         // Get API URL from environment
         const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
-        // Prepare the conversation history for the API
-        const conversationHistory = [...messages, userMessage].map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }));
 
         const response = await fetch(`${apiUrl}/chat`, {
           method: "POST",
@@ -60,7 +50,8 @@ export function useChatbot() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            messages: conversationHistory,
+            question: content.trim(),
+            conversation_id: conversationId,
           }),
         });
 
@@ -76,62 +67,75 @@ export function useChatbot() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
-        // Stream the response
+        // Stream the response (plain text streaming)
         while (true) {
           const { done, value } = await reader.read();
 
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-
-                if (data.content) {
-                  // Update the assistant message with streaming content
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: msg.content + data.content }
-                        : msg
-                    )
-                  );
-                }
-
-                if (data.done) {
-                  break;
-                }
-              } catch (error) {
-                console.error("Error parsing JSON:", error);
-                // Skip invalid JSON lines
-                continue;
-              }
+          // Handle plain text streaming - each chunk is part of the response
+          if (chunk) {
+            // Create assistant message on first content if it doesn't exist
+            if (!assistantMessageId) {
+              assistantMessageId = (Date.now() + 1).toString();
+              const assistantMessage: ChatMessage = {
+                id: assistantMessageId,
+                role: "assistant",
+                content: chunk,
+                timestamp: new Date(),
+              };
+              setMessages((prev) => [...prev, assistantMessage]);
+              setIsStreaming(true); // Mark as streaming started
+              setIsLoading(false); // Hide loading indicator once streaming starts
+            } else {
+              // Update existing assistant message with streaming content
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: msg.content + chunk }
+                    : msg
+                )
+              );
             }
           }
         }
       } catch (error) {
         console.error("Error sending message:", error);
 
-        // Replace the assistant message with an error message
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content:
-                    "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.",
-                }
-              : msg
-          )
-        );
+        // Create or replace the assistant message with an error message
+        if (!assistantMessageId) {
+          // No assistant message was created yet, create one with error
+          const errorMessageId = (Date.now() + 1).toString();
+          const errorMessage: ChatMessage = {
+            id: errorMessageId,
+            role: "assistant",
+            content:
+              "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+        } else {
+          // Replace existing assistant message with error
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    content:
+                      "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.",
+                  }
+                : msg
+            )
+          );
+        }
       } finally {
         setIsLoading(false);
+        setIsStreaming(false);
       }
     },
-    [messages, isLoading]
+    [isLoading]
   );
 
   const clearChat = useCallback(() => {
@@ -139,16 +143,17 @@ export function useChatbot() {
       {
         id: "1",
         role: "assistant",
-        content:
-          "Hello! I'm your AI Forecasting and Planning Copilot for the meat factory. I can help you analyze sales data, create production plans, and provide supply chain insights. How can I assist you today?",
+        content: "Hello! How can I assist you today?",
         timestamp: new Date(),
       },
     ]);
-  }, []);
+    resetConversationId();
+  }, [resetConversationId]);
 
   return {
     messages,
     isLoading,
+    isStreaming,
     sendMessage,
     clearChat,
   };

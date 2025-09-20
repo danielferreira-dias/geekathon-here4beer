@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Dashboard from '@/pages/Dashboard'
 import Chatbot from '@/pages/Chatbot'
 import { ThemeProvider } from '@/components/common/ThemeProvider'
+import { AnalysisProvider } from '@/contexts/AnalysisProvider'
 import { Toaster } from 'sonner'
 
 type Page = 'dashboard' | 'chatbot'
@@ -22,14 +23,16 @@ export default function App() {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="clotho-ui-theme">
-      {renderPage()}
-      <Toaster
-        position="top-right"
-        expand={true}
-        richColors={false}
-        closeButton={true}
-        theme="system"
-      />
+      <AnalysisProvider>
+        {renderPage()}
+        <Toaster
+          position="top-right"
+          expand={true}
+          richColors={false}
+          closeButton={true}
+          theme="system"
+        />
+      </AnalysisProvider>
     </ThemeProvider>
   )
 }
