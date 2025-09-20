@@ -50,8 +50,8 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
       <TopNav currentPage="chatbot" onNavigate={onNavigate} />
 
       {/* Chat Interface */}
-      <div className="w-full bg-transparent">
-        <Card className="h-[600px] flex flex-col">
+      <div className="w-full bg-transparent h-full">
+        <Card className="h-[calc(100vh-200px)] max-h-[800px] min-h-[500px] flex flex-col">
           <CardHeader className="flex-shrink-0 pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -62,7 +62,7 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
                 onClick={clearChat}
                 variant="ghost"
                 size="sm"
-                className="flex items-center gap-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                className="flex items-center gap-2 !bg-white !text-slate-700 !border !border-slate-300 hover:!bg-slate-100 dark:!bg-transparent dark:!text-slate-400 dark:hover:!bg-slate-800 dark:!border-slate-700"
               >
                 <RotateCcw className="h-4 w-4" />
                 Clear Chat
@@ -71,9 +71,9 @@ export default function Chatbot({ onNavigate }: ChatbotProps) {
             <Separator />
           </CardHeader>
 
-          <CardContent className="flex-1 flex flex-col p-0">
+          <CardContent className="flex-1 flex flex-col p-0 min-h-0">
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
               {messages.map((message) => (
                 <div
                   key={message.id}

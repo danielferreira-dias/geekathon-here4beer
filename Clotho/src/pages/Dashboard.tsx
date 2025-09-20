@@ -72,7 +72,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         )}
         <Button
           onClick={() => setShowUpload((v) => !v)}
-          className={showUpload ? '!bg-teal-600 hover:!bg-teal-700 !text-white h-12 w-12 rounded-full' : '!bg-slate-900/90 dark:!bg-slate-100/10 !text-white dark:!text-slate-200 h-12 w-12 rounded-full border border-white/10 hover:!bg-slate-800'}
+          className={showUpload 
+            ? '!bg-teal-600 hover:!bg-teal-700 !text-white h-12 w-12 rounded-full'
+            : '!bg-white dark:!bg-slate-100/10 !text-slate-700 dark:!text-slate-200 h-12 w-12 rounded-full !border !border-slate-300 dark:!border-slate-600 hover:!bg-slate-100 dark:hover:!bg-slate-800'}
           aria-label="Upload data"
         >
           <UploadCloud className="w-5 h-5" />

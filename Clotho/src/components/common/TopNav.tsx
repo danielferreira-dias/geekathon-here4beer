@@ -26,8 +26,8 @@ export function TopNav({ currentPage = 'dashboard', onNavigate }: TopNavProps) {
           onClick={() => onNavigate?.('dashboard')}
           variant="ghost"
           size="sm"
-          className={`!text-slate-600 hover:!text-slate-900 dark:!text-slate-400 dark:hover:!text-slate-100 hover:!bg-slate-100 dark:hover:!bg-slate-800 rounded-lg ${
-            currentPage === 'dashboard' ? '!bg-slate-100 dark:!bg-slate-800 !text-slate-900 dark:!text-slate-100' : ''
+          className={`rounded-lg !bg-white !text-slate-700 !border !border-slate-300 hover:!bg-slate-100 dark:!bg-transparent dark:!text-slate-400 dark:hover:!bg-slate-800 dark:!border-slate-700 ${
+            currentPage === 'dashboard' ? '!bg-blue-50 !text-blue-700 !border-blue-200 font-semibold dark:!bg-blue-900/30 dark:!text-blue-200 dark:!border-blue-800' : ''
           }`}
         >
           <div className="flex items-center gap-2">
@@ -39,8 +39,8 @@ export function TopNav({ currentPage = 'dashboard', onNavigate }: TopNavProps) {
           onClick={() => onNavigate?.('chatbot')}
           variant="ghost"
           size="sm"
-          className={`!text-slate-600 hover:!text-slate-900 dark:!text-slate-400 dark:hover:!text-slate-100 hover:!bg-slate-100 dark:hover:!bg-slate-800 rounded-lg ${
-            currentPage === 'chatbot' ? '!bg-slate-100 dark:!bg-slate-800 !text-slate-900 dark:!text-slate-100' : ''
+          className={`rounded-lg !bg-white !text-slate-700 !border !border-slate-300 hover:!bg-slate-100 dark:!bg-transparent dark:!text-slate-400 dark:hover:!bg-slate-800 dark:!border-slate-700 ${
+            currentPage === 'chatbot' ? '!bg-blue-50 !text-blue-700 !border-blue-200 font-semibold dark:!bg-blue-900/30 dark:!text-blue-200 dark:!border-blue-800' : ''
           }`}
         >
           <div className="flex items-center gap-2">
