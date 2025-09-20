@@ -20,8 +20,11 @@ def save_analysis(run_id: str, analysis_json: Dict[str, Any], notes: Optional[st
             run = Run(id=run_id, created_at=datetime.utcnow(), notes=notes)
             session.add(run)
             session.flush()
-        elif notes is not None:
-            run.notes = notes
+        else:
+            if notes is not None:
+                run.notes = notes
+        # Store/Update summary_text on the run
+        run.summary_text = analysis_json.get("summary_text") or run.summary_text
 
         # Clear prior data for this run_id to keep idempotent inserts
         session.query(Forecast).filter_by(run_id=run_id).delete()

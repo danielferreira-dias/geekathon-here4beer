@@ -13,6 +13,7 @@ class Run(Base):
     id = Column(String, primary_key=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
+    summary_text = Column(Text, nullable=True)
 
     # Relationships
     forecasts = relationship("Forecast", back_populates="run", cascade="all, delete-orphan")

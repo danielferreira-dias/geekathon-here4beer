@@ -45,6 +45,19 @@ app.include_router(chat_router.router, prefix="/chat")
 async def _init_db_on_startup():
     Base.metadata.create_all(bind=engine)
 
+    # Lightweight migration: ensure runs.summary_text exists (SQLite-safe)
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            cols = conn.execute(text("PRAGMA table_info(runs)")).fetchall()
+            col_names = {c[1] for c in cols}
+            if "summary_text" not in col_names:
+                conn.execute(text("ALTER TABLE runs ADD COLUMN summary_text TEXT"))
+                conn.commit()
+    except Exception as e:
+        # Don’t crash startup if this fails; logs help debug
+        print(f"Schema check/migration for runs.summary_text failed: {e}")
+
     # Start scheduler for Risk Sentry at 08:00 UTC daily
     tz = pytz.UTC
     scheduler = BackgroundScheduler(timezone=tz)

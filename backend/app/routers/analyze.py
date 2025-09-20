@@ -62,20 +62,6 @@ async def analyze(
     # Generate a run_id
     run_id = str(uuid.uuid4())
 
-    # Override summary_text to a concise, consistent format matching GET /analyze
-    try:
-        stockout_count = sum(
-            1 for p in validated.production_plan if int(p.forecasted_demand) > int(p.current_inventory)
-        )
-        expiry_count = sum(
-            1 for r in validated.risk_alerts if str(getattr(r, "alert_type", "")).lower() == "expiry"
-        )
-        validated.summary_text = (
-            f"Analysis for run {run_id}. Stockout risks: {stockout_count}. Expiry alerts: {expiry_count}."
-        )
-    except Exception:
-        # If anything goes wrong computing the concise summary, fall back to existing summary_text
-        pass
 
     # Persist results for use in /chat and future queries
     try:
@@ -143,12 +129,17 @@ async def get_latest_analysis():
             ],
         }
 
-        # Derive a brief summary_text to fulfill the schema contract
-        stockout_count = sum(1 for p in plans if int(p.forecasted_demand) > int(p.current_inventory))
-        expiry_count = sum(1 for r in alerts if (r.alert_type or "").lower() == "expiry")
-        payload["summary_text"] = (
-            f"Analysis for run {run_id}. Stockout risks: {stockout_count}. Expiry alerts: {expiry_count}."
-        )
+        # Fetch the saved summary from the runs table (preferred)
+        run_row = session.execute(select(db_models.Run).where(db_models.Run.id == run_id)).scalar_one()
+        if getattr(run_row, "summary_text", None):
+            payload["summary_text"] = run_row.summary_text
+        else:
+            # Fallback: derive a brief summary_text to fulfill the schema contract
+            stockout_count = sum(1 for p in plans if int(p.forecasted_demand) > int(p.current_inventory))
+            expiry_count = sum(1 for r in alerts if (r.alert_type or "").lower() == "expiry")
+            payload["summary_text"] = (
+                f"Analysis for run {run_id}. Stockout risks: {stockout_count}. Expiry alerts: {expiry_count}."
+            )
 
         # Validate against schema (ensures RiskAlert.severity is added)
         try:
