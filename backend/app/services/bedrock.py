@@ -3,6 +3,7 @@ import os
 from typing import Any, Dict
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 # Region and model id (ARN recommended)
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
@@ -25,31 +26,57 @@ class BedrockClient:
             raise RuntimeError("BEDROCK_MODEL_ID is not set")
         self._client = boto3.client("bedrock-runtime", region_name=self.region)
 
+    def _refresh_client(self) -> None:
+        # Recreate the boto3 client using a fresh Session (helps with SSO/assume-role refresh)
+        session = boto3.session.Session(region_name=self.region)
+        self._client = session.client("bedrock-runtime")
+
     def generate_json(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """
         Calls Bedrock Converse with system + user prompts and returns parsed JSON from the model output.
+        If credentials are expired, refresh the client once and retry. Propagates errors to caller.
         """
-        resp = self._client.converse(
-            modelId=self.model_id,
-            system=[{"text": system_prompt}] if system_prompt else [],
-            messages=[{
-                "role": "user",
-                "content": [{"text": user_prompt}],
-            }],
-            inferenceConfig={
-                "maxTokens": MAX_TOKENS,
-                "temperature": TEMPERATURE,
-                "topP": TOP_P,
-            },
-            additionalModelRequestFields={
-                "top_k": TOP_K,
-            },
-        )
+        def _call():
+            return self._client.converse(
+                modelId=self.model_id,
+                system=[{"text": system_prompt}] if system_prompt else [],
+                messages=[{
+                    "role": "user",
+                    "content": [{"text": user_prompt}],
+                }],
+                inferenceConfig={
+                    "maxTokens": MAX_TOKENS,
+                    "temperature": TEMPERATURE,
+                    "topP": TOP_P,
+                },
+                additionalModelRequestFields={
+                    "top_k": TOP_K,
+                },
+            )
+
+        try:
+            resp = _call()
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code") if hasattr(e, "response") else None
+            if code in {"ExpiredToken", "ExpiredTokenException"}:
+                self._refresh_client()
+                resp = _call()
+            else:
+                raise
+        except BotoCoreError:
+            # Retry once on generic botocore transport error
+            self._refresh_client()
+            resp = _call()
+
         # Extract text from the response and parse JSON
         content = resp.get("output", {}).get("message", {}).get("content", [])
         text_parts = [part.get("text", "") for part in content if isinstance(part, dict) and "text" in part]
         text = "".join(text_parts).strip()
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            # Propagate parsing errors so caller can handle
+            raise e
 
     @staticmethod
     def _mock_response() -> Dict[str, Any]:
