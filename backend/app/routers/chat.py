@@ -68,7 +68,7 @@ class ConversationMemory:
             del self._store[conv_id]
 
 
-# ---- Structured per-conversation context for focus SKUs, etc. ----
+# ---- Structured per-conversation context for focus SKUs, suppliers, etc. ----
 class ConversationContext:
     def __init__(self, max_conversations: int = 200):
         self.max_conversations = max_conversations
@@ -129,7 +129,7 @@ def _bedrock_client():
     return boto3.client("bedrock-runtime", region_name=AWS_REGION)
 
 
-# Tool specs exposed to Bedrock
+# Tool specs exposed to Bedrock (kept for reference)
 TOOLS = [
     {
         "toolSpec": {
@@ -263,7 +263,7 @@ async def _handle_tool_call(name: str, args: dict):
         payload = {"message": message}
         # ---- retry on throttling/5xx with exponential backoff
         attempts = 3
-        backoffs = [1.0, 2.0]  # seconds (last attempt has no sleep afterward)
+        backoffs = [1.0, 2.0]  # seconds
         for i in range(attempts):
             try:
                 logger.info("[AgentServiceTool] Calling %s with payload=%s", AGENT_SERVICE_QUERY_URL, payload)
@@ -274,22 +274,16 @@ async def _handle_tool_call(name: str, args: dict):
                 except Exception:
                     data = {"response": text}
                 logger.info("[AgentServiceTool] Status=%s Response=%s", r.status_code, data)
-                # Consider throttling if status >= 500 or error string mentions throttling
+                # Retry on 5xx/throttling
                 if r.status_code >= 500 or ("ThrottlingException" in text):
                     if i < attempts - 1:
-                        try:
-                            await asyncio.sleep(backoffs[i])
-                        except Exception:
-                            pass
+                        await asyncio.sleep(backoffs[i])
                         continue
                 return {"response": data.get("response")}
             except Exception as e:
                 logger.exception("[AgentServiceTool] ERROR calling service (attempt %s): %s", i + 1, e)
                 if i < attempts - 1:
-                    try:
-                        await asyncio.sleep(backoffs[i])
-                    except Exception:
-                        pass
+                    await asyncio.sleep(backoffs[i])
                     continue
                 return {"error": f"agent_service_query failed: {e}"}
 
@@ -298,6 +292,7 @@ async def _handle_tool_call(name: str, args: dict):
     return {"error": f"Unknown tool: {name}"}
 
 
+# ---------- Supplier response summarization / formatting ----------
 def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
     """Summarize the external procurement agent response into concise, context-aware bullets.
     Accepts markdown headings like '## Providers selling ...'.
@@ -308,7 +303,6 @@ def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
     sections: Dict[str, List[Dict[str, Any]]] = {}
     current_sku: Optional[str] = None
 
-    # Accept optional markdown prefix (##, -, *, etc.) before 'Providers selling'
     header_re = re.compile(
         r"^\s*(?:[#*\-\d\.]+\s*)?providers selling ['\"]?([^'\"]+)['\"]?:\s*$",
         re.IGNORECASE,
@@ -321,7 +315,7 @@ def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
         s = raw.strip()
         m = header_re.match(s)
         if m:
-            current_sku = m.group(1).strip()
+            current_sku = m.group(1).strip().replace(" ", "_")
             sections.setdefault(current_sku, [])
             continue
         if s.startswith("- "):
@@ -398,6 +392,63 @@ def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
     return "\n".join(lines[:8]).strip()
 
 
+def _prettify_supplier_summary(summary_text: str, focus_skus: Optional[List[str]] = None) -> str:
+    """
+    Convert summarized supplier lines into your house style:
+
+    **Supplier options (bread loaf)**
+    1) A — $2.99 — stock 400 — 12 km  *(best price)*
+    2) B — $5.99 — stock 150 — 12 km
+    3) C — $6.25 — stock 110 — 14 km
+    """
+    if not summary_text:
+        return ""
+
+    lines = [ln.strip() for ln in summary_text.splitlines() if ln.strip()]
+    sku_lines = [ln for ln in lines if ln.startswith("- ") and ":" in ln]
+    if not sku_lines:
+        return summary_text
+
+    blocks: List[str] = []
+    allowed = set(focus_skus or [])
+
+    for ln in sku_lines:
+        head, tail = ln[2:].split(":", 1)
+        sku = head.strip()
+        if allowed and sku not in allowed:
+            continue
+
+        best_match = re.search(r"Best price:\s*([^\(]+)\s*\(\$(\d+(?:\.\d+)?)\)", tail, re.IGNORECASE)
+        best_name = (best_match.group(1).strip() if best_match else None)
+
+        # Remove the "Best price: ..." sentence from tail before parsing providers
+        tail = re.sub(r"\.\s*Best price:.*$", "", tail).strip().strip(".")
+
+        providers = [p.strip() for p in tail.split(",") if p.strip()]
+        pretty_rows: List[str] = []
+        for idx, pv in enumerate(providers, start=1):
+            # Name is text before price/stock/dist separators
+            name = re.split(r"\s\$\d|\sstock\s|\s\d+\s*km|\s—\s|\s-\s", pv, maxsplit=1)[0].strip()
+            price = re.search(r"\$(\d+(?:\.\d+)?)", pv)
+            stock = re.search(r"stock\s+(\d+)", pv, re.IGNORECASE)
+            dist  = re.search(r"(\d+)\s*km", pv, re.IGNORECASE)
+
+            parts = [name]
+            if price: parts.append(f"${float(price.group(1)):.2f}")
+            if stock: parts.append(f"stock {stock.group(1)}")
+            if dist:  parts.append(f"{dist.group(1)} km")
+
+            row = f"{idx}) " + " — ".join(parts)
+            if best_name and name.lower() == best_name.lower():
+                row += "  *(best price)*"
+            pretty_rows.append(row)
+
+        pretty_sku = sku.replace("_", " ")
+        blocks.append("\n".join([f"**Supplier options ({pretty_sku})**"] + pretty_rows))
+
+    return "\n\n".join(blocks).strip() or summary_text
+
+
 def _extract_best_suppliers_from_summary(text: str) -> Dict[str, Dict[str, Any]]:
     """Parse lines like "- sku: ... Best price: Name ($X.YY)" into a map {sku: {name, price}}."""
     best: Dict[str, Dict[str, Any]] = {}
@@ -442,18 +493,32 @@ def _compose_natural_recommendation(items: List[Dict[str, Any]], best_map: Dict[
     return "\n".join([s1, s2, s3])
 
 
+def _coalesce_final_reply(primary_text: str, supplier_block: str, email_hint: str = "") -> str:
+    """
+    Build one cohesive message with consistent headings and spacing.
+    """
+    parts = []
+    if primary_text.strip():
+        parts.append(primary_text.strip())
+    if supplier_block.strip():
+        parts.append(supplier_block.strip())
+    if email_hint.strip():
+        parts.append(email_hint.strip())
+    return "\n\n".join(parts)
+
+
 # --------- Name → SKU inference helpers ----------
 def _infer_skus_from_question(q: str, limit: int = 5) -> List[str]:
     if not q:
         return []
     ql = q.lower()
     candidates: List[str] = []
-    tokens = re.findall(r"[a-z0-9]+(?:\s+[a-z0-9]+){0,2}", ql)
+    tokens = re.findall(r"[a-z0-9_]+(?:\s+[a-z0-9_]+){0,2}", ql)
     for t in tokens:
         t = t.strip()
         if len(t) < 3:
             continue
-        if t in {"what", "which", "those", "these", "stock", "stocks", "supplier", "suppliers", "buy", "purchase"}:
+        if t in {"what", "which", "those", "these", "stock", "stocks", "supplier", "suppliers", "buy", "purchase", "email", "order", "units", "loaves"}:
             continue
         candidates.append(t)
 
@@ -463,7 +528,7 @@ def _infer_skus_from_question(q: str, limit: int = 5) -> List[str]:
             for cand in candidates[:8]:
                 res = conn.execute(sql_text("""
                     SELECT sku FROM products 
-                    WHERE LOWER(name) LIKE :q OR LOWER(category) LIKE :q
+                    WHERE LOWER(name) LIKE :q OR LOWER(category) LIKE :q OR LOWER(sku) LIKE :q
                     LIMIT 3
                 """), {"q": f"%{cand}%"})
                 for row in res:
@@ -535,12 +600,110 @@ async def _fetch_supplier_summary_for_skus(sku_list: List[str], limit_per_sku: i
     return summarized or None
 
 
+# ---------- Email drafting helpers ----------
+def _parse_email_intent(q: str) -> Tuple[bool, Optional[int], Optional[str], Optional[str]]:
+    """
+    Returns: (is_email_intent, qty, sku, supplier_name)
+    Understands phrases like:
+      - "draft email for 500 units of bread loaf"
+      - "email the best supplier for chicken_breast"
+      - "order 300 chicken breasts"
+      - "write an email to Root Vegetable Co for 200 bread_loaf"
+      - Affirmatives only: "yes", "ok", "go ahead" (uses context to fill missing fields)
+    """
+    if not q:
+        return False, None, None, None
+    ql = q.lower().strip()
+
+    # Affirmative-only reply (in response to our Next step)
+    if re.fullmatch(r"(yes|yeah|yep|ok|okay|sure|do it|go ahead|please do|please|sounds good|let'?s do it|proceed)[\.\!\s]*", ql):
+        return True, None, None, None
+
+    # Email intent keywords
+    email_triggers = ["draft email", "write an email", "email the", "email", "send an email", "send email", "order"]
+    if not any(k in ql for k in email_triggers):
+        return False, None, None, None
+
+    qty = None
+    sku = None
+    supplier = None
+
+    # qty
+    m_qty = re.search(r"\b(\d{1,6})\s*(units|unit|pcs|pieces|loaves)?\b", ql)
+    if m_qty:
+        try:
+            qty = int(m_qty.group(1))
+        except Exception:
+            qty = None
+
+    # supplier name (after 'to'/'with'/'from')
+    m_sup = re.search(r"\b(?:to|with|from)\s+([a-z0-9][a-z0-9\s&\.\-]+)$", ql.strip())
+    if m_sup:
+        supplier = m_sup.group(1).strip()
+
+    # sku (after 'of ' or 'for ')
+    m_sku = re.search(r"\b(?:of|for)\s+([a-z0-9_][a-z0-9_\s\-]+)", ql)
+    if m_sku:
+        sku = m_sku.group(1).strip().replace(" ", "_")
+
+    return True, qty, sku, supplier
+
+
+def _email_next_step_hint(skus: List[str]) -> str:
+    if not skus:
+        return ""
+    sku_pretty = skus[0].replace("_", " ")
+    # Natural-language nudge only — no code examples.
+    return f"Next step: want me to draft an email order to the **best supplier** for **{sku_pretty}**?"
+
+
+def _store_supplier_context(conv_id: Optional[str], providers_text: Optional[str], selected_skus: List[str]):
+    if not conv_id or not providers_text:
+        return
+    try:
+        best_map = _extract_best_suppliers_from_summary(providers_text)
+        ctx = _ctx.get(conv_id)
+        last_map = ctx.get("best_map") or {}
+        last_map.update(best_map)
+        _ctx.update(
+            conv_id,
+            last_supplier_summary=providers_text,
+            best_map=last_map,
+            last_result_skus=selected_skus or ctx.get("last_result_skus"),
+        )
+    except Exception:
+        pass
+
+
+def _get_best_supplier_for_sku(conv_id: Optional[str], sku: str) -> Optional[str]:
+    if not conv_id or not sku:
+        return None
+    ctx = _ctx.get(conv_id)
+    best_map = ctx.get("best_map") or {}
+    info = best_map.get(sku)
+    if info and isinstance(info.get("name"), str):
+        return info["name"]
+    return None
+
+
+async def _draft_email_with_agent(qty: int, sku: str, supplier_name: Optional[str]) -> Optional[str]:
+    if qty is None or not sku:
+        return None
+    sku_display = sku.replace("_", " ").strip()
+    if supplier_name and supplier_name.strip().lower() not in {"best", "best supplier"}:
+        msg = f"write an email to order {qty} units of {sku_display} to {supplier_name}"
+    else:
+        msg = f"write an email to order {qty} units of {sku_display} to the best supplier"
+    res = await _handle_tool_call("agent_service_query", {"message": msg})
+    return (res or {}).get("response") if isinstance(res, dict) else None
+
+
 @router.post("")
 async def chat(req: ChatRequest):
     schema_text, allowed_tables, schema_map = _schema_from_metadata()
 
     async def gen():
-        # Send an early tiny chunk to nudge proxies/browsers to display streaming
+        # Send an early tiny chunk so proxies begin the response (we'll still buffer content)
         yield " "
         await asyncio.sleep(0.05)
 
@@ -569,9 +732,70 @@ async def chat(req: ChatRequest):
         except Exception:
             pass
 
-        # Fallback: handle "low SKUs" style questions directly via DB without Bedrock
+        # ---------- Email intent (can be a bare "yes") ----------
+        try:
+            is_email, qty_req, sku_req, supplier_req = _parse_email_intent(req.question or "")
+        except Exception:
+            is_email, qty_req, sku_req, supplier_req = (False, None, None, None)
+
+        if is_email:
+            # Resolve SKU from context if not provided
+            if not sku_req:
+                ctx_focus = _ctx.get(req.conversation_id)
+                focus_skus = ctx_focus.get("focus_skus") or ctx_focus.get("last_result_skus") or []
+                if focus_skus:
+                    sku_req = focus_skus[0]
+
+            # Resolve qty from context (use last known deficit as a sensible default)
+            if qty_req is None:
+                ctx_focus = _ctx.get(req.conversation_id)
+                last_deficits: Dict[str, int] = ctx_focus.get("last_deficits") or {}
+                if sku_req and last_deficits.get(sku_req):
+                    qty_req = int(last_deficits[sku_req])
+
+            # Resolve supplier (prefer explicit; else best supplier in context)
+            if supplier_req is None or supplier_req.strip().lower() in {"best", "best supplier"}:
+                best_name = _get_best_supplier_for_sku(req.conversation_id, sku_req or "")
+                supplier_name_for_prompt = best_name if best_name else "best supplier"
+            else:
+                supplier_name_for_prompt = supplier_req
+
+            if not sku_req or qty_req is None:
+                # Not enough info to draft; guide user succinctly
+                missing = []
+                if sku_req is None:
+                    missing.append("SKU")
+                if qty_req is None:
+                    missing.append("quantity")
+                guidance = " and ".join(missing)
+                msg = f"I can draft the email, but I’m missing the {guidance.lower()}. For example: “500 units of bread loaf”."
+                yield msg
+                if req.conversation_id:
+                    _memory.append(req.conversation_id, "user", req.question)
+                    _memory.append(req.conversation_id, "assistant", msg)
+                return
+
+            # Draft email via agent-service
+            email_text = await _draft_email_with_agent(qty_req, sku_req, supplier_name_for_prompt)
+            if not email_text:
+                msg = "I couldn't generate the email right now."
+                yield msg
+                if req.conversation_id:
+                    _memory.append(req.conversation_id, "user", req.question)
+                    _memory.append(req.conversation_id, "assistant", msg)
+                return
+
+            # Clean, cohesive reply with a markdown block
+            final_email = f"**Draft email ({sku_req.replace('_',' ')}, {qty_req} units)**\n\n```\n{email_text.strip()}\n```"
+            yield final_email
+            if req.conversation_id:
+                _memory.append(req.conversation_id, "user", req.question)
+                _memory.append(req.conversation_id, "assistant", final_email)
+            return
+
+        # ---------- Fallback: handle "low SKUs" style questions directly via DB without Bedrock ----------
         q_lower = (req.question or "").lower()
-        low_keywords = ["low", "low stock", "running low", "replenish", "reorder"]
+        low_keywords = ["low", "low stock", "running low", "replenish", "reorder", "risky", "risk"]
         sku_keywords = ["sku", "skus", "product", "products", "inventory", "stock", "stocks", "stock level", "stock levels", "stockout", "stock-outs", "stock outs"]
         if any(k in q_lower for k in low_keywords) and any(k in q_lower for k in sku_keywords):
             try:
@@ -592,10 +816,6 @@ async def chat(req: ChatRequest):
 
                 if not rows:
                     msg = "No SKUs are currently below forecasted demand in the latest run."
-                    try:
-                        logger.info("[POST /chat] Fallback low-SKUs: no rows found")
-                    except Exception:
-                        pass
                     yield msg
                     try:
                         if req.conversation_id:
@@ -606,7 +826,8 @@ async def chat(req: ChatRequest):
                     return
 
                 items = []
-                lines = ["SKUs running low (inventory < forecast):"]
+                lines = ["**Low Stock Summary:**"]
+                last_deficits: Dict[str, int] = {}
                 for r in rows[:50]:
                     sku = r.get('sku')
                     try:
@@ -629,6 +850,8 @@ async def chat(req: ChatRequest):
                     items.append({"sku": sku, "fd": fd, "ci": ci, "sp": sp, "deficit": deficit})
                     if deficit is not None:
                         lines.append(f"- {sku}: inv {ci}, forecast {fd}, deficit {deficit}, suggested_production {sp}")
+                        if isinstance(deficit, int):
+                            last_deficits[sku] = int(deficit)
                     else:
                         lines.append(f"- {sku}: inv {ci}, forecast {fd}, suggested_production {sp}")
 
@@ -646,32 +869,23 @@ async def chat(req: ChatRequest):
                 except Exception as e:
                     logger.exception("[POST /chat] Auto-procurement section failed: %s", e)
 
-                if providers_text:
-                    lines.append("")
-                    try:
-                        if selected_skus:
-                            intro = "I looked up supplier options for " + (", ".join(selected_skus[:-1]) + f" and {selected_skus[-1]}" if len(selected_skus) > 1 else selected_skus[0]) + ":"
-                            lines.append(intro)
-                    except Exception:
-                        pass
-                    lines.append(providers_text)
-                    try:
-                        best_map = _extract_best_suppliers_from_summary(providers_text)
-                        rec = _compose_natural_recommendation(items, best_map)
-                        if rec:
-                            lines.append("")
-                            lines.append(rec)
-                    except Exception:
-                        pass
+                primary_text = "\n".join(lines)
+                pretty_suppliers = _prettify_supplier_summary(providers_text or "", selected_skus) if providers_text else ""
 
-                text = "\n".join(lines)
-                logger.info("[POST /chat] Fallback low-SKUs response generated without Bedrock. rows=%d providers=%s",
-                            len(rows), 'yes' if providers_text else 'no')
-                yield text
+                # Store supplier context + deficits for email follow-up
+                _store_supplier_context(req.conversation_id, providers_text, selected_skus)
+                if req.conversation_id:
+                    _ctx.update(req.conversation_id, last_deficits=last_deficits)
+
+                email_hint = _email_next_step_hint(selected_skus)
+
+                final_reply = _coalesce_final_reply(primary_text, pretty_suppliers, email_hint)
+
+                yield final_reply
                 try:
                     if req.conversation_id:
                         _memory.append(req.conversation_id, "user", req.question)
-                        _memory.append(req.conversation_id, "assistant", text)
+                        _memory.append(req.conversation_id, "assistant", final_reply)
                         low_skus = [it["sku"] for it in items if isinstance(it.get("sku"), str)]
                         if low_skus:
                             _ctx.update(req.conversation_id, focus_skus=low_skus, last_result_skus=low_skus)
@@ -681,7 +895,7 @@ async def chat(req: ChatRequest):
             except Exception as e:
                 logger.exception("[POST /chat] Low-SKUs fallback failed: %s", e)
 
-        # Supplier/provider intent: directly ask external procurement agent
+        # ---------- Supplier/provider intent: directly ask external procurement agent ----------
         supplier_keywords = [
             "recommend a supplier",
             "recommend supplier",
@@ -720,33 +934,25 @@ async def chat(req: ChatRequest):
 
                 if not merged_skus:
                     res = await _handle_tool_call("agent_service_query", {"message": req.question or ""})
-                    resp_text = ""
-                    if isinstance(res, dict):
-                        resp_text = (res.get("response") or "").strip()
-                    summarized = _summarize_agent_response(resp_text, limit_per_sku=3) if resp_text else ""
-                    msg = summarized or "I could not find matching suppliers."
+                    resp_text = (res or {}).get("response") if isinstance(res, dict) else ""
+                    summarized = _summarize_agent_response(resp_text or "", limit_per_sku=3) if resp_text else ""
+                    final_reply = _prettify_supplier_summary(summarized, None) if summarized else "I could not find matching suppliers."
+                    # Store for follow-ups
+                    _store_supplier_context(req.conversation_id, summarized, [])
                     if req.conversation_id:
                         _memory.append(req.conversation_id, "user", req.question)
-                        _memory.append(req.conversation_id, "assistant", msg)
-                    yield msg
+                        _memory.append(req.conversation_id, "assistant", final_reply)
+                    yield final_reply
                     return
 
                 providers_text = await _fetch_supplier_summary_for_skus(merged_skus, limit_per_sku=3)
+                final_pretty = _prettify_supplier_summary(providers_text or "", merged_skus) if providers_text else "No supplier matches for the requested items."
 
-                final = ""
-                if providers_text:
-                    allowed = set(merged_skus)
-                    filtered_lines = []
-                    for ln in providers_text.splitlines():
-                        m = re.match(r"^\-\s*([^:]+)\s*:", ln.strip())
-                        if m:
-                            sku = m.group(1).strip()
-                            if sku not in allowed:
-                                continue
-                        filtered_lines.append(ln)
-                    final = "\n".join(filtered_lines).strip()
-                if not final:
-                    final = "No supplier matches for the requested items."
+                # Store for follow-ups
+                _store_supplier_context(req.conversation_id, providers_text, merged_skus)
+
+                email_hint = _email_next_step_hint(merged_skus)
+                final = _coalesce_final_reply(final_pretty, "", email_hint)
 
                 if req.conversation_id:
                     _memory.append(req.conversation_id, "user", req.question)
@@ -760,6 +966,7 @@ async def chat(req: ChatRequest):
                 yield "I could not retrieve supplier information right now."
                 return
 
+        # ---------- General path via Bedrock (SQL generation + explanation) ----------
         br = _bedrock_client()
         if br is None:
             logger.info("[POST /chat] Bedrock not configured; responding with guidance")
@@ -828,6 +1035,27 @@ async def chat(req: ChatRequest):
             yield f"SQL execution error: {e}"
             return
 
+        try:
+            last_deficits: Dict[str, int] = {}
+            for r in rows:
+                sku = r.get("sku")
+                fd = r.get("forecasted_demand")
+                ci = r.get("current_inventory")
+                if isinstance(sku, str) and fd is not None and ci is not None:
+                    try:
+                        d = int(fd) - int(ci)
+                        if d > 0:
+                            last_deficits[sku] = d
+                    except Exception:
+                        pass
+            if last_deficits and req.conversation_id:
+                ctx_existing = _ctx.get(req.conversation_id)
+                merged = dict(ctx_existing.get("last_deficits") or {})
+                merged.update(last_deficits)
+                _ctx.update(req.conversation_id, last_deficits=merged)
+        except Exception:
+            pass
+
         # Update focus SKUs from rows
         try:
             focus_from_rows = _collect_skus_from_rows(rows)
@@ -836,31 +1064,20 @@ async def chat(req: ChatRequest):
         except Exception:
             pass
 
-        # Proactive supplier suggestions for deficits in general path (single batched call)
-        auto_supplier_block = ""
+        # Proactive supplier suggestions for deficits (single batched call)
+        pretty_suppliers = ""
         top_skus_for_auto: List[str] = []
         try:
             top_skus_for_auto = _top_deficit_skus(rows)
             if top_skus_for_auto:
                 prov = await _fetch_supplier_summary_for_skus(top_skus_for_auto, limit_per_sku=3)
                 if prov:
-                    # Post-filter to requested SKUs
-                    allowed = set(top_skus_for_auto)
-                    filtered_lines = []
-                    for ln in prov.splitlines():
-                        m = re.match(r"^\-\s*([^:]+)\s*:", ln.strip())
-                        if m:
-                            sku = m.group(1).strip()
-                            if sku not in allowed:
-                                continue
-                        filtered_lines.append(ln)
-                    prov = "\n".join(filtered_lines).strip()
-                    if prov:
-                        auto_supplier_block = "\n\nSupplier options for critical gaps:\n" + prov
+                    pretty_suppliers = _prettify_supplier_summary(prov, top_skus_for_auto)
+                    _store_supplier_context(req.conversation_id, prov, top_skus_for_auto)
         except Exception:
             pass
 
-        # Explain with streaming
+        # Explain with "streaming" but buffer, then emit once
         explain_user = (
             "Explain these results in plain English for a supply chain planner. Be concise and clear. "
             "You may rely on the prior conversation for context if relevant.\n\n"
@@ -869,7 +1086,7 @@ async def chat(req: ChatRequest):
         )
         assistant_chunks: List[str] = []
         try:
-            logger.info("[POST /chat] Starting streaming explanation...")
+            logger.info("[POST /chat] Starting buffered explanation...")
             async for chunk in _stream_bedrock_explanation(
                 br,
                 model_id=_model_id(),
@@ -877,24 +1094,27 @@ async def chat(req: ChatRequest):
                 history_msgs=history_msgs,
             ):
                 assistant_chunks.append(chunk)
-                yield chunk
-            if auto_supplier_block:
-                yield auto_supplier_block
-                assistant_chunks.append(auto_supplier_block)
-            logger.info("[POST /chat] Streaming explanation completed. total_chunks=%d", len(assistant_chunks))
+            logger.info("[POST /chat] Buffered explanation completed. total_chunks=%d", len(assistant_chunks))
         except Exception as e:
             logger.exception("[POST /chat] Streaming failed: %s", e)
             yield f"Streaming failed: {e}"
             return
 
+        primary_text = "".join(assistant_chunks).strip()
+
+        # Email hint (natural language only) if we have supplier info
+        email_hint = _email_next_step_hint(top_skus_for_auto) if pretty_suppliers else ""
+
+        final_reply = _coalesce_final_reply(primary_text, pretty_suppliers, email_hint)
+
+        # Emit one cohesive message
+        yield final_reply
+
         # Persist this turn
         try:
             if conv_id:
                 _memory.append(conv_id, "user", req.question)
-                final_text = "".join(assistant_chunks)
-                _memory.append(conv_id, "assistant", final_text)
-                if top_skus_for_auto:
-                    _ctx.update(conv_id, focus_skus=top_skus_for_auto, last_result_skus=top_skus_for_auto)
+                _memory.append(conv_id, "assistant", final_reply)
         except Exception:
             pass
 
@@ -909,7 +1129,7 @@ async def chat(req: ChatRequest):
     )
 
 
-# Streaming helpers
+# Streaming helpers (we buffer outputs; we don't stream to the client mid-reply)
 async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text: str, history_msgs: Optional[List[Dict[str, Any]]] = None):
     if not model_id:
         raise RuntimeError("BEDROCK_MODEL_ID is not set")
@@ -942,7 +1162,7 @@ async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text:
                 break
         return
 
-    # Fallback: non-streaming response, chunk manually
+    # Fallback: non-streaming response, chunk manually (still buffered to user)
     msgs2 = []
     if history_msgs:
         msgs2.extend(history_msgs)
@@ -955,6 +1175,7 @@ async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text:
     content = resp2.get("output", {}).get("message", {}).get("content", [])
     text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
     full_text = "".join(text_parts)
+    # Emit buffered chunks to our caller (we'll join them before returning to the client)
     chunk_size = 128
     for i in range(0, len(full_text), chunk_size):
         yield full_text[i:i+chunk_size]
