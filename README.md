@@ -66,6 +66,16 @@ Development of a dedicated API endpoint for direct CSV database integration:
 
 **Implementation Path**: Create new FastAPI endpoints in the backend service for CSV processing and database integration, extending the current provider database functionality.
 
+### AI Agent Routing Implementation
+Development of an intelligent routing system to seamlessly switch between forecasting and provider services:
+- **Intent Classification** - Automatically classify user queries to determine optimal service routing
+- **Smart Query Distribution** - Route forecasting requests to `backend/app/services/bedrock.py` and provider queries to `agent-service/app/services/agent_class.py`
+- **Hybrid Workflows** - Handle complex queries requiring both forecasting and provider data through multi-step orchestration
+- **Context Preservation** - Maintain conversation history and context across different AI services
+- **Performance Optimization** - Implement caching layer for frequently accessed provider data
+
+**Implementation Path**: Create `AgentRouter` class in backend service with lightweight LLM-based intent classification, HTTP client integration for agent service communication, and unified endpoint for seamless user experience.
+
 ### Additional Planned Features
 
 - **Multi-tenant Support** - Separate environments for different food producers
