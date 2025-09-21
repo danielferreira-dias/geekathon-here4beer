@@ -4,10 +4,11 @@ import asyncio
 import logging
 from typing import Dict, Any, List, Set, Optional
 from collections import OrderedDict, deque
+import re
 
 import boto3
 import requests
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import text as sql_text
@@ -184,22 +185,6 @@ TOOLS = [
             }
         }
     },
-    {
-        "toolSpec": {
-            "name": "find_providers_for_product",
-            "description": "Convenience wrapper to ask the procurement agent which providers produce/sell a given product (SKU).",
-            "inputSchema": {
-                "json": {
-                    "type": "object",
-                    "properties": {
-                        "product": {"type": "string", "description": "Product or SKU name, e.g., 'milk'"}
-                    },
-                    "required": ["product"],
-                    "additionalProperties": False
-                }
-            }
-        }
-    },
 ]
 
 
@@ -261,25 +246,221 @@ async def _handle_tool_call(name: str, args: dict):
             logger.exception("[AgentServiceTool] ERROR calling service: %s", e)
             return {"error": f"agent_service_query failed: {e}"}
 
-    if name == "find_providers_for_product":
-        product = ((args or {}).get("product") or "").strip()
-        message = f"what providers produce {product}?" if product else "what providers produce ?"
-        payload = {"message": message}
-        try:
-            logger.info("[AgentServiceTool] Calling %s with payload=%s", AGENT_SERVICE_QUERY_URL, payload)
-            r = requests.post(AGENT_SERVICE_QUERY_URL, json=payload, timeout=10)
-            text = r.text
-            try:
-                data = r.json()
-            except Exception:
-                data = {"response": text}
-            logger.info("[AgentServiceTool] Status=%s Response=%s", r.status_code, data)
-            return {"response": data.get("response"), "product": product}
-        except Exception as e:
-            logger.exception("[AgentServiceTool] ERROR calling service: %s", e)
-            return {"error": f"find_providers_for_product failed: {e}", "product": product}
 
     return {"error": f"Unknown tool: {name}"}
+
+
+def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
+    """Summarize the external procurement agent response into concise, context-aware bullets.
+    Expected format segments like:
+      Providers selling 'bread_loaf':
+      - Root Vegetable Co: $2.99 - North Carolina (Stock: 400, Distance: 12km)
+    If sections are not present, fall back to first few bullet lines.
+    """
+    if not resp_text:
+        return ""
+    lines = resp_text.splitlines()
+    sections: Dict[str, List[Dict[str, Any]]] = {}
+    current_sku: Optional[str] = None
+
+    header_re = re.compile(r"^\s*providers selling ['\"]?([^'\"]+)['\"]?:\s*$", re.IGNORECASE)
+    price_re = re.compile(r"\$(\d+(?:\.\d+)?)")
+    stock_re = re.compile(r"stock:\s*(\d+)", re.IGNORECASE)
+    dist_re = re.compile(r"distance:\s*(\d+)\s*km", re.IGNORECASE)
+
+    for raw in lines:
+        m = header_re.match(raw.strip())
+        if m:
+            current_sku = m.group(1).strip()
+            sections.setdefault(current_sku, [])
+            continue
+        if raw.strip().startswith("- "):
+            # Attempt to parse a provider bullet
+            name = None
+            price: Optional[float] = None
+            stock: Optional[int] = None
+            distance_km: Optional[int] = None
+            content = raw.strip()[2:]
+            # Name is text before first ':' if exists
+            if ':' in content:
+                name = content.split(':', 1)[0].strip()
+            else:
+                # fallback: until first ' - '
+                name = content.split(' - ', 1)[0].strip()
+            pm = price_re.search(raw)
+            if pm:
+                try:
+                    price = float(pm.group(1))
+                except Exception:
+                    price = None
+            sm = stock_re.search(raw)
+            if sm:
+                try:
+                    stock = int(sm.group(1))
+                except Exception:
+                    stock = None
+            dm = dist_re.search(raw)
+            if dm:
+                try:
+                    distance_km = int(dm.group(1))
+                except Exception:
+                    distance_km = None
+            entry = {"name": name, "price": price, "stock": stock, "distance_km": distance_km, "raw": raw.strip()}
+            if current_sku:
+                sections.setdefault(current_sku, [])
+                sections[current_sku].append(entry)
+            else:
+                sections.setdefault("__unscoped__", [])
+                sections["__unscoped__"].append(entry)
+        else:
+            # Non-bullet; ignore
+            continue
+
+    out: List[str] = []
+    # Prefer sectioned output
+    section_keys = [k for k in sections.keys() if k != "__unscoped__"]
+    if section_keys:
+        out.append("Supplier suggestions (top options):")
+        for sku in section_keys:
+            providers = sections.get(sku, [])
+            # Keep first limit_per_sku already in order
+            providers = providers[:limit_per_sku]
+            if not providers:
+                continue
+            parts = []
+            best_price = None
+            best_name = None
+            for p in providers:
+                frag_parts = [p.get("name") or "Unknown"]
+                if p.get("price") is not None:
+                    frag_parts.append(f"${p['price']:.2f}")
+                if p.get("stock") is not None:
+                    frag_parts.append(f"stock {p['stock']}")
+                if p.get("distance_km") is not None:
+                    frag_parts.append(f"{p['distance_km']}km")
+                parts.append(" ".join(part for part in frag_parts if part))
+                # Track best price
+                if p.get("price") is not None and (best_price is None or p['price'] < best_price):
+                    best_price = p['price']
+                    best_name = p.get("name")
+            line = f"- {sku}: " + ", ".join(parts)
+            if best_price is not None and best_name:
+                line += f". Best price: {best_name} (${best_price:.2f})"
+            out.append(line)
+        return "\n".join(out)
+
+    # Fallback: no section headers found; use first few bullets overall
+    bullets = sections.get("__unscoped__", [])
+    if bullets:
+        out.append("Top supplier options:")
+        for p in bullets[:limit_per_sku]:
+            # Use raw for robustness
+            out.append(p.get("raw") or "")
+        return "\n".join(out).strip()
+
+    # Last resort: return trimmed original text
+    return "\n".join(lines[: 8]).strip()
+
+
+def _extract_best_suppliers_from_summary(text: str) -> Dict[str, Dict[str, Any]]:
+    """Parse lines like "- sku: ... Best price: Name ($X.YY)" into a map {sku: {name, price}}."""
+    best: Dict[str, Dict[str, Any]] = {}
+    if not text:
+        return best
+    line_re = re.compile(r"^\-\s*([^:]+):.*?Best price:\s*([^\(]+)\s*\(\$(\d+(?:\.\d+)?)\)", re.IGNORECASE)
+    for ln in text.splitlines():
+        m = line_re.match(ln.strip())
+        if m:
+            sku = m.group(1).strip()
+            name = m.group(2).strip()
+            try:
+                price = float(m.group(3))
+            except Exception:
+                price = None
+            best[sku] = {"name": name, "price": price}
+    return best
+
+
+def _compose_natural_recommendation(items: List[Dict[str, Any]], best_map: Dict[str, Dict[str, Any]]) -> Optional[str]:
+    """Create a short, natural closing recommendation based on deficits and best suppliers."""
+    prioritized = [it for it in items if isinstance(it.get("deficit"), int) and isinstance(it.get("sku"), str)]
+    if not prioritized:
+        return None
+    prioritized.sort(key=lambda x: x.get("deficit", 0), reverse=True)
+    top_names = [it["sku"] for it in prioritized[:2]]
+    # First sentence: prioritization
+    if len(top_names) == 1:
+        s1 = f"Recommendation: prioritize {top_names[0]} due to the highest deficit."
+    else:
+        s1 = f"Recommendation: prioritize {top_names[0]} and {top_names[1]} due to the highest deficits."
+    # Second sentence: best suppliers and order targets
+    picks = []
+    for it in prioritized[:4]:  # keep concise
+        sku = it["sku"]
+        deficit = it.get("deficit")
+        best = best_map.get(sku)
+        if best and best.get("price") is not None:
+            picks.append(f"{sku} → {best['name']} (${best['price']:.2f}, order ~{deficit})")
+        else:
+            picks.append(f"{sku} → order ~{deficit}")
+    s2 = "Best-price picks and order targets: " + ", ".join(picks) + "."
+    s3 = "If you confirm, I can draft purchase orders to cover the gaps."
+    return "\n".join([s1, s2, s3])
+
+
+async def _fetch_supplier_summary_for_skus(sku_list: List[str], limit_per_sku: int = 3) -> Optional[str]:
+    """Call agent-service for the given SKUs and ensure per-SKU summarized output.
+    If the combined response is ambiguous (not grouped per SKU) and there are multiple SKUs,
+    fallback to querying each SKU individually and merging concise lines per SKU.
+    """
+    if not sku_list:
+        return None
+
+    # 1) Try combined query with explicit formatting instructions
+    joined = " and ".join(sku_list)
+    combined_msg = (
+        f"what suppliers produce {joined}? "
+        f"Please include sections titled exactly: Providers selling '{{SKU}}': for each product, "
+        f"with up to {limit_per_sku} bullet items per section (name, price with $, stock, distance in km)."
+    )
+    res = await _handle_tool_call("agent_service_query", {"message": combined_msg})
+    resp_text = (res or {}).get("response") if isinstance(res, dict) else None
+    providers_text = _summarize_agent_response((resp_text or "").strip(), limit_per_sku=limit_per_sku) if resp_text else ""
+
+    def _is_ambiguous(text: str) -> bool:
+        if not text:
+            return True
+        # Ambiguous if it's generic top options without per-SKU lines
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return True
+        if lines[0].lower().startswith("top supplier options:"):
+            return True
+        # Look for lines like "- sku: ..."
+        has_per_sku = any(re.match(r"^-\s*[^:]+:\s", ln) for ln in lines)
+        return not has_per_sku
+
+    if len(sku_list) > 1 and _is_ambiguous(providers_text):
+        # 2) Fallback: query per SKU and merge
+        merged_lines: List[str] = ["Supplier suggestions (top options):"]
+        for sku in sku_list:
+            single_msg = (
+                f"what suppliers produce {sku}? Please include a section titled exactly: Providers selling '{sku}': "
+                f"and list at most {limit_per_sku} suppliers as bullets."
+            )
+            single_res = await _handle_tool_call("agent_service_query", {"message": single_msg})
+            single_resp_text = (single_res or {}).get("response") if isinstance(single_res, dict) else None
+            summarized = _summarize_agent_response((single_resp_text or "").strip(), limit_per_sku=limit_per_sku) if single_resp_text else ""
+            # Extract the first per-SKU line ("- sku: ...")
+            if summarized:
+                for ln in summarized.splitlines():
+                    if ln.strip().startswith(f"- {sku}:"):
+                        merged_lines.append(ln)
+                        break
+        final_text = "\n".join(merged_lines) if len(merged_lines) > 1 else providers_text
+        return final_text.strip()
+
+    return providers_text.strip() if providers_text else None
 
 
 @router.post("")
@@ -372,7 +553,8 @@ async def chat(req: ChatRequest):
                         lines.append(f"- {sku}: inv {ci}, forecast {fd}, suggested_production {sp}")
 
                 # Auto-contact external procurement agent for a few top-low SKUs
-                providers_sections: List[str] = []
+                providers_text: Optional[str] = None
+                selected_skus: List[str] = []
                 try:
                     # Pick up to 4 most critical (largest deficit) items with a valid SKU string
                     top_items = [it for it in items if isinstance(it.get('sku'), str)]
@@ -381,41 +563,42 @@ async def chat(req: ChatRequest):
                     top_items = top_items[:4]
 
                     if top_items:
-                        logger.info("[POST /chat] Auto-procurement: querying providers for %d SKUs", len(top_items))
-                        tasks = []
-                        for it in top_items:
-                            sku = it['sku']
-                            # Log tool usage explicitly
-                            logger.info("[POST /chat] Tool(find_providers_for_product) args={product=%s}", sku)
-                            tasks.append(_handle_tool_call("find_providers_for_product", {"product": sku}))
-                        results = await asyncio.gather(*tasks, return_exceptions=True)
-                        for it, res in zip(top_items, results):
-                            sku = it['sku']
-                            if isinstance(res, Exception):
-                                logger.exception("[POST /chat] Provider query failed for %s: %s", sku, res)
-                                continue
-                            if not isinstance(res, dict):
-                                continue
-                            resp_text = (res.get("response") or "").strip()
-                            if not resp_text:
-                                continue
-                            # Skip "No providers found" responses
-                            if resp_text.lower().startswith("no providers found"):
-                                continue
-                            # Include as-is; external response already formatted
-                            providers_sections.append(resp_text)
+                        selected_skus = [it['sku'] for it in top_items]
+                        try:
+                            logger.info("[POST /chat] Auto-procurement: querying providers for SKUs=%s", selected_skus)
+                        except Exception:
+                            pass
+                        providers_text = await _fetch_supplier_summary_for_skus(selected_skus, limit_per_sku=3)
                 except Exception as e:
                     logger.exception("[POST /chat] Auto-procurement section failed: %s", e)
 
                 # Combine final text
-                if providers_sections:
+                if providers_text:
                     lines.append("")
-                    lines.append("Potential suppliers (auto-fetched):")
-                    for sec in providers_sections:
-                        lines.append(sec)
+                    # Add a natural connective instead of a hard-coded header
+                    try:
+                        if selected_skus:
+                            if len(selected_skus) == 1:
+                                intro = f"I looked up supplier options for {selected_skus[0]}:"
+                            else:
+                                intro = "I looked up supplier options for " + ", ".join(selected_skus[:-1]) + f" and {selected_skus[-1]}:"
+                            lines.append(intro)
+                    except Exception:
+                        # If anything goes wrong, skip the intro silently
+                        pass
+                    lines.append(providers_text)
+                    # Add a natural closing recommendation based on deficits and best suppliers
+                    try:
+                        best_map = _extract_best_suppliers_from_summary(providers_text)
+                        rec = _compose_natural_recommendation(items, best_map)
+                        if rec:
+                            lines.append("")
+                            lines.append(rec)
+                    except Exception:
+                        pass
                 text = "\n".join(lines)
                 try:
-                    logger.info("[POST /chat] Fallback low-SKUs response generated without Bedrock. rows=%d providers=%d", len(rows), len(providers_sections))
+                    logger.info("[POST /chat] Fallback low-SKUs response generated without Bedrock. rows=%d providers_text=%s", len(rows), 'yes' if providers_text else 'no')
                 except Exception:
                     pass
                 yield text
@@ -440,59 +623,54 @@ async def chat(req: ChatRequest):
             "recommend a supplier",
             "recommend supplier",
             "supplier for",
+            "suppliers",
+            "supplier",
             "provider for",
+            "providers",
             "recommend a provider",
             "find supplier",
+            "find suppliers",
             "find providers",
             "find a supplier",
             "recommend vendor",
             "vendor for",
+            "vendor",
+            "vendors",
+            "producer",
+            "producers",
+            "produce",
             "where to buy",
+            "where can i buy",
+            "who sells",
+            "who supplies",
+            "who produces",
             "purchase from",
+            "buy",
+            "purchase",
         ]
         if any(k in q_lower for k in supplier_keywords):
-            # Naive product extraction: substring after ' for ' if present; else last token
-            product_raw = None
+            # Forward the full natural-language question to the external procurement agent
             try:
-                if " for " in q_lower:
-                    # Use original casing from question for product span
-                    after_for = (req.question or "").split(" for ", 1)[1]
-                    product_raw = after_for.strip().strip("?.! ")
-                else:
-                    # fallback: last word
-                    parts_orig = (req.question or "").strip().strip("?.! ").split()
-                    product_raw = parts_orig[-1] if parts_orig else None
+                logger.info("[POST /chat] Tool(agent_service_query) args={message=%s}", req.question)
             except Exception:
-                product_raw = None
-            product = (product_raw or "").strip()
-            if product:
-                try:
-                    logger.info("[POST /chat] Tool(find_providers_for_product) args={product=%s}", product)
-                except Exception:
-                    pass
-                res = await _handle_tool_call("find_providers_for_product", {"product": product})
-                # Build final text from tool response
-                resp_text = ""
-                if isinstance(res, dict):
-                    resp_text = (res.get("response") or "").strip()
-                if not resp_text:
-                    msg = f"I couldn't retrieve supplier information for '{product}' right now."
-                else:
-                    msg = resp_text
-                try:
-                    if req.conversation_id:
-                        _memory.append(req.conversation_id, "user", req.question)
-                        _memory.append(req.conversation_id, "assistant", msg)
-                except Exception:
-                    pass
-                yield msg
-                return
+                pass
+            res = await _handle_tool_call("agent_service_query", {"message": req.question or ""})
+            resp_text = ""
+            if isinstance(res, dict):
+                resp_text = (res.get("response") or "").strip()
+            if not resp_text:
+                msg = "I couldn't retrieve supplier information right now."
             else:
-                # No product parsed; fall through to Bedrock
-                try:
-                    logger.info("[POST /chat] Supplier intent detected but no product parsed; falling back to Bedrock")
-                except Exception:
-                    pass
+                summarized = _summarize_agent_response(resp_text, limit_per_sku=3)
+                msg = summarized or resp_text
+            try:
+                if req.conversation_id:
+                    _memory.append(req.conversation_id, "user", req.question)
+                    _memory.append(req.conversation_id, "assistant", msg)
+            except Exception:
+                pass
+            yield msg
+            return
 
         br = _bedrock_client()
         if br is None:
@@ -637,92 +815,6 @@ async def chat(req: ChatRequest):
     )
 
 
-@router.websocket("/ws")
-async def chat_ws(ws: WebSocket):
-    await ws.accept()
-    try:
-        init = await ws.receive_json()
-        question: str = init.get("question")
-        run_id: Optional[str] = init.get("run_id")
-        conv_id: Optional[str] = init.get("conversation_id")
-        if not question:
-            await ws.send_text(json.dumps({"error": "question is required"}))
-            await ws.close()
-            return
-        if not run_id:
-            latest = await _handle_tool_call("get_latest_run_id", {})
-            run_id = latest.get("run_id") or ""
-
-        system_prompt = (
-            "You are Food Copilot. Answer user questions by using tools to get DB schema and query the DB. "
-            "Rules: Generate only SELECT queries, include LIMIT 200, avoid semicolons, and filter by run_id when relevant. "
-            "If run_id is missing, call get_latest_run_id. If schema is unknown, call get_schema before writing SQL. "
-            "You can also run what-if simulations with simulate_scenario and compare runs with diff_runs. "
-            "If you identify SKUs/products with low stock or that require replenishment, call find_providers_for_product (preferred) or agent_service_query to ask another agent for suppliers. "
-            "In your final answer, include any provider list returned. If the tool response says 'No providers found', do not mention providers at all."
-        )
-
-        br = _bedrock_client()
-        if br is None:
-            await ws.send_text("Bedrock not configured.")
-            await ws.close()
-            return
-
-        # Seed with prior conversation history if provided
-        history_msgs = _memory.get(conv_id)
-        messages = [*history_msgs, {"role": "user", "content": [{"text": f"Question: {question}\nRunId: {run_id}"}]}]
-
-        for _ in range(6):
-            payload = {
-                "modelId": _model_id(),
-                "system": [{"text": system_prompt}],
-                "messages": messages,
-                "inferenceConfig": {"maxTokens": 700, "temperature": 0.0},
-                "toolConfig": {"tools": TOOLS, "toolChoice": {"auto": {}}},
-            }
-            resp = br.converse(**payload)
-            content = resp.get("output", {}).get("message", {}).get("content", [])
-
-            tool_calls = [c.get("toolUse") for c in content if c.get("toolUse")]
-            text_parts = [c.get("text") for c in content if "text" in c]
-
-            if not tool_calls:
-                final_text = "".join([t for t in text_parts if t])
-                # Stream tokens to client
-                for token in final_text.split():
-                    await ws.send_text(token + " ")
-                await ws.send_text("\n[END]")
-                # Persist this turn
-                try:
-                    if conv_id:
-                        _memory.append(conv_id, "user", question)
-                        _memory.append(conv_id, "assistant", final_text)
-                except Exception:
-                    pass
-                await ws.close()
-                return
-
-            tool_results_content = []
-            for tu in tool_calls:
-                name = tu.get("name")
-                args = tu.get("input", {}) or {}
-                try:
-                    logger.info("[ToolCall] name=%s args=%s", name, args)
-                except Exception:
-                    pass
-                result = await _handle_tool_call(name, args)
-                tool_results_content.append({
-                    "toolResult": {"toolUseId": tu.get("toolUseId"), "content": [{"json": result}]}
-                })
-
-            messages.append({"role": "assistant", "content": content})
-            messages.append({"role": "user", "content": tool_results_content})
-
-    except WebSocketDisconnect:
-        return
-    except Exception as e:
-        await ws.send_text(json.dumps({"error": str(e)}))
-        await ws.close()
 
 
 # Streaming helpers
