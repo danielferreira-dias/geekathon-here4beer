@@ -1,8 +1,8 @@
-From: no-reply@meusite.com
-To: contato@exemplo.com
-Subject: Pedido confirmado #12345
+From: purchasing@restaurantgroup.com
+To: sales@here4beer.com
+Subject: Bulk Food Order Request - Restaurant Chain #PO-2025-0921
 Date: Sun, 21 Sep 2025 00:54:29 +0000
-Message-ID: <175841606928.11.11068628172177590014@meusite.com>
+Message-ID: <175841606928.11.11068628172177590014@restaurantgroup.com>
 MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="===============1908549756391621807=="
 
@@ -14,13 +14,37 @@ Content-Type: multipart/alternative;
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
 
-Olá,
+Dear Here4Beer Food Suppliers,
 
-Seu pedido #12345 foi confirmado e está sendo processado.
-Qualquer dúvida, responda a este e-mail.
+We are a restaurant chain looking to place a bulk order for our upcoming month's operations.
+Based on your current inventory, we would like to purchase the following items:
 
-Abraços,
-Equipe Minha Loja
+ORDER DETAILS:
+- Sausages 1kg: 150 units (Current stock: 658 units available)
+- Chicken Breast: 200 units (Current stock: 703 units available)
+- Pork Chops: 120 units (Current stock: 656 units available)
+- Yogurt Pack: 80 units (Current stock: 385 units available)
+- Bread Loaf: 250 units (Current stock: 746 units available)
+
+DELIVERY REQUIREMENTS:
+- Delivery Date: October 1st, 2025
+- Delivery Address: 1234 Restaurant Blvd, Food City, FC 12345
+- Contact: John Smith, Purchasing Manager
+- Phone: (555) 123-4567
+
+PAYMENT TERMS:
+- Net 30 days
+- Purchase Order #PO-2025-0921
+- Total estimated value: $15,000 - $20,000
+
+Please confirm availability and provide pricing for this bulk order. We are looking to establish a long-term partnership with reliable suppliers.
+
+Best regards,
+John Smith
+Purchasing Manager
+Restaurant Group International
+purchasing@restaurantgroup.com
+(555) 123-4567
 
 --===============8513911248033390529==
 Content-Type: text/html; charset="utf-8"
@@ -30,11 +54,50 @@ MIME-Version: 1.0
 <!doctype html>
 <html>
   <body>
-    <p>Ol=C3=A1,</p>
-    <p>Seu pedido <strong>#12345</strong> foi confirmado e est=C3=A1 sendo pr=
-ocessado.</p>
-    <p>Qualquer d=C3=BAvida, basta responder a este e-mail.</p>
-    <p>Abra=C3=A7os,<br>Equipe Minha Loja</p>
+    <h2>Bulk Food Order Request</h2>
+    <p><strong>From:</strong> Restaurant Group International</p>
+    <p><strong>PO Number:</strong> PO-2025-0921</p>
+
+    <h3>Order Details:</h3>
+    <table border="1" style="border-collapse: collapse;">
+      <tr>
+        <th>Item</th>
+        <th>Quantity Requested</th>
+        <th>Available Stock</th>
+      </tr>
+      <tr>
+        <td>Sausages 1kg</td>
+        <td>150 units</td>
+        <td>658 units</td>
+      </tr>
+      <tr>
+        <td>Chicken Breast</td>
+        <td>200 units</td>
+        <td>703 units</td>
+      </tr>
+      <tr>
+        <td>Pork Chops</td>
+        <td>120 units</td>
+        <td>656 units</td>
+      </tr>
+      <tr>
+        <td>Yogurt Pack</td>
+        <td>80 units</td>
+        <td>385 units</td>
+      </tr>
+      <tr>
+        <td>Bread Loaf</td>
+        <td>250 units</td>
+        <td>746 units</td>
+      </tr>
+    </table>
+
+    <h3>Delivery Information:</h3>
+    <p><strong>Date:</strong> October 1st, 2025</p>
+    <p><strong>Address:</strong> 1234 Restaurant Blvd, Food City, FC 12345</p>
+    <p><strong>Contact:</strong> John Smith - (555) 123-4567</p>
+
+    <p>Looking forward to your response!</p>
   </body>
 </html>
 
@@ -43,9 +106,25 @@ ocessado.</p>
 --===============1908549756391621807==
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: 8bit
-Content-Disposition: attachment; filename="nota.txt"
+Content-Disposition: attachment; filename="purchase_order_details.txt"
 MIME-Version: 1.0
 
-Este é um anexo de exemplo (nota interna).
+PURCHASE ORDER #PO-2025-0921
+Restaurant Group International
+Contact: John Smith, Purchasing Manager
+Email: purchasing@restaurantgroup.com
+Phone: (555) 123-4567
+
+ITEMS REQUESTED:
+- Sausages 1kg: 150 units
+- Chicken Breast: 200 units
+- Pork Chops: 120 units
+- Yogurt Pack: 80 units
+- Bread Loaf: 250 units
+
+TOTAL UNITS: 800 units
+ESTIMATED VALUE: $15,000 - $20,000
+DELIVERY DATE: October 1st, 2025
+PAYMENT TERMS: Net 30 days
 
 --===============1908549756391621807==--

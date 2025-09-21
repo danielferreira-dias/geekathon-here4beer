@@ -298,6 +298,151 @@ This email draft has been generated based on provider information from our datab
             except Exception as e:
                 return f"Error sending email to provider '{provider_name}': {str(e)}"
 
+        @tool("parse_email_order_tool", return_direct=True, description="Parses an email file and extracts order information from a buyer. Use this when user asks to analyze or check an email order. Takes the email file path as input.")
+        def parse_email_order_tool(email_file_path: str = "app/tools/file_example.eml"):
+            """Parses an email file and creates a summary of what the buyer wants to order"""
+            try:
+                import email
+                import re
+                import os
+
+                # Default to the example file if no path provided
+                if not email_file_path or email_file_path == "default":
+                    email_file_path = os.path.join(os.path.dirname(__file__), '..', 'tools', 'file_example.eml')
+
+                # Read and parse the email file
+                with open(email_file_path, 'r', encoding='utf-8') as file:
+                    email_content = file.read()
+
+                # Parse the email
+                msg = email.message_from_string(email_content)
+
+                # Extract basic email information
+                sender = msg.get('From', 'Unknown')
+                recipient = msg.get('To', 'Unknown')
+                subject = msg.get('Subject', 'No Subject')
+                date = msg.get('Date', 'Unknown Date')
+
+                # Extract the email body (look for text/plain content)
+                email_body = ""
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_type() == "text/plain":
+                            email_body = part.get_payload(decode=True).decode('utf-8')
+                            break
+                else:
+                    email_body = msg.get_payload(decode=True).decode('utf-8')
+
+                # Parse order details from the email body
+                order_items = []
+                po_number = "Not specified"
+                delivery_date = "Not specified"
+                total_value = "Not specified"
+                contact_info = "Not specified"
+
+                # Extract PO number
+                po_match = re.search(r'PO[#\-\s]*([A-Z0-9\-]+)', email_body, re.IGNORECASE)
+                if po_match:
+                    po_number = po_match.group(1)
+
+                # Extract delivery date
+                delivery_match = re.search(r'Delivery Date[:\s]*([^\n]+)', email_body, re.IGNORECASE)
+                if delivery_match:
+                    delivery_date = delivery_match.group(1).strip()
+
+                # Extract total value
+                value_match = re.search(r'Total.*value[:\s]*\$?([\d,\-\s]+)', email_body, re.IGNORECASE)
+                if value_match:
+                    total_value = value_match.group(1).strip()
+
+                # Extract contact information
+                contact_match = re.search(r'Contact[:\s]*([^\n]+)', email_body, re.IGNORECASE)
+                if contact_match:
+                    contact_info = contact_match.group(1).strip()
+
+                # Extract order items (looking for patterns like "Item: quantity units")
+                item_patterns = [
+                    r'- ([^:]+):\s*(\d+)\s*units',
+                    r'([^:]+):\s*(\d+)\s*units',
+                ]
+
+                for pattern in item_patterns:
+                    matches = re.findall(pattern, email_body, re.IGNORECASE)
+                    for match in matches:
+                        item_name = match[0].strip()
+                        quantity = match[1].strip()
+                        order_items.append(f"{item_name}: {quantity} units")
+
+                # Create summary
+                summary = f"""
+EMAIL ORDER SUMMARY
+==================
+
+📧 Email Details:
+   From: {sender}
+   To: {recipient}
+   Subject: {subject}
+   Date: {date}
+
+📋 Order Information:
+   Purchase Order: {po_number}
+   Delivery Date: {delivery_date}
+   Estimated Value: {total_value}
+   Contact: {contact_info}
+
+📦 Items Requested:
+"""
+
+                if order_items:
+                    for item in order_items:
+                        summary += f"   • {item}\n"
+                else:
+                    summary += "   • No specific items found in standard format\n"
+
+                # Add total items count
+                total_items = len(order_items)
+                total_units = 0
+                for item in order_items:
+                    units_match = re.search(r'(\d+)\s*units', item)
+                    if units_match:
+                        total_units += int(units_match.group(1))
+
+                summary += f"\n📊 Order Summary:\n"
+                summary += f"   Total Item Types: {total_items}\n"
+                summary += f"   Total Units Requested: {total_units}\n"
+
+                # Check availability against our database
+                summary += f"\n🔍 Availability Check:\n"
+                try:
+                    # Check each item against our providers
+                    for item_line in order_items:
+                        item_name = item_line.split(':')[0].strip()
+                        requested_qty = re.search(r'(\d+)', item_line.split(':')[1])
+
+                        if requested_qty:
+                            qty = int(requested_qty.group(1))
+
+                            # Convert item name to match our database format
+                            item_db_name = item_name.lower().replace(' ', '_')
+
+                            # Check providers for this item
+                            providers = self.provider_db.get_providers_by_item(item_db_name)
+                            if providers:
+                                total_stock = sum(p['stock'] for p in providers)
+                                cheapest = min(providers, key=lambda x: x['price'])
+                                summary += f"   • {item_name}: {len(providers)} providers available, total stock: {total_stock}, cheapest: ${cheapest['price']} from {cheapest['provider_name']}\n"
+                            else:
+                                summary += f"   • {item_name}: No providers found in our database\n"
+                except Exception as e:
+                    summary += f"   • Error checking availability: {str(e)}\n"
+
+                return summary
+
+            except FileNotFoundError:
+                return f"Error: Email file not found at path: {email_file_path}"
+            except Exception as e:
+                return f"Error parsing email: {str(e)}"
+
         return [
             get_all_providers_tool,
             search_providers_by_item_tool,
@@ -307,7 +452,8 @@ This email draft has been generated based on provider information from our datab
             get_stock_summary_tool,
             general_search_tool,
             write_draft_email_too,
-            send_draft_email_tool
+            send_draft_email_tool,
+            parse_email_order_tool
         ]
 
     def query_with_memory(self, user_input: str, max_rounds: int = 5):
