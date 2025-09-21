@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 import logging
-from typing import Dict, Any, List, Set, Optional
+from typing import Dict, Any, List, Set, Optional, Tuple
 from collections import OrderedDict, deque
 import re
 
@@ -68,7 +68,36 @@ class ConversationMemory:
             del self._store[conv_id]
 
 
+# ---- Structured per-conversation context for focus SKUs, etc. ----
+class ConversationContext:
+    def __init__(self, max_conversations: int = 200):
+        self.max_conversations = max_conversations
+        self._ctx: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+
+    def get(self, conv_id: Optional[str]) -> Dict[str, Any]:
+        if not conv_id:
+            return {}
+        if conv_id in self._ctx:
+            self._ctx.move_to_end(conv_id)
+            return self._ctx[conv_id]
+        return {}
+
+    def update(self, conv_id: Optional[str], **kv):
+        if not conv_id:
+            return
+        ctx = self._ctx.get(conv_id) or {}
+        ctx.update({k: v for k, v in kv.items() if v is not None})
+        self._ctx[conv_id] = ctx
+        while len(self._ctx) > self.max_conversations:
+            self._ctx.popitem(last=False)
+
+    def clear(self, conv_id: Optional[str]):
+        if conv_id in self._ctx:
+            del self._ctx[conv_id]
+
+
 _memory = ConversationMemory()
+_ctx = ConversationContext()
 
 
 class ChatRequest(BaseModel):
@@ -77,7 +106,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
 
 
-def _schema_from_metadata() -> tuple[str, List[str], Dict[str, Set[str]]]:
+def _schema_from_metadata() -> Tuple[str, List[str], Dict[str, Set[str]]]:
     lines: List[str] = []
     allowed_tables: List[str] = []
     schema: Dict[str, Set[str]] = {}
@@ -232,30 +261,46 @@ async def _handle_tool_call(name: str, args: dict):
     if name == "agent_service_query":
         message = (args or {}).get("message") or ""
         payload = {"message": message}
-        try:
-            logger.info("[AgentServiceTool] Calling %s with payload=%s", AGENT_SERVICE_QUERY_URL, payload)
-            r = requests.post(AGENT_SERVICE_QUERY_URL, json=payload, timeout=10)
-            text = r.text
+        # ---- retry on throttling/5xx with exponential backoff
+        attempts = 3
+        backoffs = [1.0, 2.0]  # seconds (last attempt has no sleep afterward)
+        for i in range(attempts):
             try:
-                data = r.json()
-            except Exception:
-                data = {"response": text}
-            logger.info("[AgentServiceTool] Status=%s Response=%s", r.status_code, data)
-            return {"response": data.get("response")}
-        except Exception as e:
-            logger.exception("[AgentServiceTool] ERROR calling service: %s", e)
-            return {"error": f"agent_service_query failed: {e}"}
+                logger.info("[AgentServiceTool] Calling %s with payload=%s", AGENT_SERVICE_QUERY_URL, payload)
+                r = requests.post(AGENT_SERVICE_QUERY_URL, json=payload, timeout=12)
+                text = r.text
+                try:
+                    data = r.json()
+                except Exception:
+                    data = {"response": text}
+                logger.info("[AgentServiceTool] Status=%s Response=%s", r.status_code, data)
+                # Consider throttling if status >= 500 or error string mentions throttling
+                if r.status_code >= 500 or ("ThrottlingException" in text):
+                    if i < attempts - 1:
+                        try:
+                            await asyncio.sleep(backoffs[i])
+                        except Exception:
+                            pass
+                        continue
+                return {"response": data.get("response")}
+            except Exception as e:
+                logger.exception("[AgentServiceTool] ERROR calling service (attempt %s): %s", i + 1, e)
+                if i < attempts - 1:
+                    try:
+                        await asyncio.sleep(backoffs[i])
+                    except Exception:
+                        pass
+                    continue
+                return {"error": f"agent_service_query failed: {e}"}
 
+        return {"error": "agent_service_query failed after retries."}
 
     return {"error": f"Unknown tool: {name}"}
 
 
 def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
     """Summarize the external procurement agent response into concise, context-aware bullets.
-    Expected format segments like:
-      Providers selling 'bread_loaf':
-      - Root Vegetable Co: $2.99 - North Carolina (Stock: 400, Distance: 12km)
-    If sections are not present, fall back to first few bullet lines.
+    Accepts markdown headings like '## Providers selling ...'.
     """
     if not resp_text:
         return ""
@@ -263,68 +308,64 @@ def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
     sections: Dict[str, List[Dict[str, Any]]] = {}
     current_sku: Optional[str] = None
 
-    header_re = re.compile(r"^\s*providers selling ['\"]?([^'\"]+)['\"]?:\s*$", re.IGNORECASE)
+    # Accept optional markdown prefix (##, -, *, etc.) before 'Providers selling'
+    header_re = re.compile(
+        r"^\s*(?:[#*\-\d\.]+\s*)?providers selling ['\"]?([^'\"]+)['\"]?:\s*$",
+        re.IGNORECASE,
+    )
     price_re = re.compile(r"\$(\d+(?:\.\d+)?)")
     stock_re = re.compile(r"stock:\s*(\d+)", re.IGNORECASE)
     dist_re = re.compile(r"distance:\s*(\d+)\s*km", re.IGNORECASE)
 
     for raw in lines:
-        m = header_re.match(raw.strip())
+        s = raw.strip()
+        m = header_re.match(s)
         if m:
             current_sku = m.group(1).strip()
             sections.setdefault(current_sku, [])
             continue
-        if raw.strip().startswith("- "):
-            # Attempt to parse a provider bullet
+        if s.startswith("- "):
             name = None
             price: Optional[float] = None
             stock: Optional[int] = None
             distance_km: Optional[int] = None
-            content = raw.strip()[2:]
-            # Name is text before first ':' if exists
+            content = s[2:]
             if ':' in content:
                 name = content.split(':', 1)[0].strip()
             else:
-                # fallback: until first ' - '
                 name = content.split(' - ', 1)[0].strip()
-            pm = price_re.search(raw)
+            pm = price_re.search(s)
             if pm:
                 try:
                     price = float(pm.group(1))
                 except Exception:
                     price = None
-            sm = stock_re.search(raw)
+            sm = stock_re.search(s)
             if sm:
                 try:
                     stock = int(sm.group(1))
                 except Exception:
                     stock = None
-            dm = dist_re.search(raw)
+            dm = dist_re.search(s)
             if dm:
                 try:
                     distance_km = int(dm.group(1))
                 except Exception:
                     distance_km = None
-            entry = {"name": name, "price": price, "stock": stock, "distance_km": distance_km, "raw": raw.strip()}
+            entry = {"name": name, "price": price, "stock": stock, "distance_km": distance_km, "raw": s}
             if current_sku:
                 sections.setdefault(current_sku, [])
                 sections[current_sku].append(entry)
             else:
                 sections.setdefault("__unscoped__", [])
                 sections["__unscoped__"].append(entry)
-        else:
-            # Non-bullet; ignore
-            continue
 
     out: List[str] = []
-    # Prefer sectioned output
     section_keys = [k for k in sections.keys() if k != "__unscoped__"]
     if section_keys:
         out.append("Supplier suggestions (top options):")
         for sku in section_keys:
-            providers = sections.get(sku, [])
-            # Keep first limit_per_sku already in order
-            providers = providers[:limit_per_sku]
+            providers = (sections.get(sku) or [])[:limit_per_sku]
             if not providers:
                 continue
             parts = []
@@ -339,27 +380,22 @@ def _summarize_agent_response(resp_text: str, limit_per_sku: int = 3) -> str:
                 if p.get("distance_km") is not None:
                     frag_parts.append(f"{p['distance_km']}km")
                 parts.append(" ".join(part for part in frag_parts if part))
-                # Track best price
                 if p.get("price") is not None and (best_price is None or p['price'] < best_price):
-                    best_price = p['price']
-                    best_name = p.get("name")
+                    best_price = p['price']; best_name = p.get("name")
             line = f"- {sku}: " + ", ".join(parts)
             if best_price is not None and best_name:
                 line += f". Best price: {best_name} (${best_price:.2f})"
             out.append(line)
         return "\n".join(out)
 
-    # Fallback: no section headers found; use first few bullets overall
     bullets = sections.get("__unscoped__", [])
     if bullets:
         out.append("Top supplier options:")
         for p in bullets[:limit_per_sku]:
-            # Use raw for robustness
             out.append(p.get("raw") or "")
         return "\n".join(out).strip()
 
-    # Last resort: return trimmed original text
-    return "\n".join(lines[: 8]).strip()
+    return "\n".join(lines[:8]).strip()
 
 
 def _extract_best_suppliers_from_summary(text: str) -> Dict[str, Dict[str, Any]]:
@@ -388,14 +424,12 @@ def _compose_natural_recommendation(items: List[Dict[str, Any]], best_map: Dict[
         return None
     prioritized.sort(key=lambda x: x.get("deficit", 0), reverse=True)
     top_names = [it["sku"] for it in prioritized[:2]]
-    # First sentence: prioritization
     if len(top_names) == 1:
         s1 = f"Recommendation: prioritize {top_names[0]} due to the highest deficit."
     else:
         s1 = f"Recommendation: prioritize {top_names[0]} and {top_names[1]} due to the highest deficits."
-    # Second sentence: best suppliers and order targets
     picks = []
-    for it in prioritized[:4]:  # keep concise
+    for it in prioritized[:4]:
         sku = it["sku"]
         deficit = it.get("deficit")
         best = best_map.get(sku)
@@ -408,59 +442,97 @@ def _compose_natural_recommendation(items: List[Dict[str, Any]], best_map: Dict[
     return "\n".join([s1, s2, s3])
 
 
+# --------- Name → SKU inference helpers ----------
+def _infer_skus_from_question(q: str, limit: int = 5) -> List[str]:
+    if not q:
+        return []
+    ql = q.lower()
+    candidates: List[str] = []
+    tokens = re.findall(r"[a-z0-9]+(?:\s+[a-z0-9]+){0,2}", ql)
+    for t in tokens:
+        t = t.strip()
+        if len(t) < 3:
+            continue
+        if t in {"what", "which", "those", "these", "stock", "stocks", "supplier", "suppliers", "buy", "purchase"}:
+            continue
+        candidates.append(t)
+
+    skus: List[str] = []
+    try:
+        with engine.connect() as conn:
+            for cand in candidates[:8]:
+                res = conn.execute(sql_text("""
+                    SELECT sku FROM products 
+                    WHERE LOWER(name) LIKE :q OR LOWER(category) LIKE :q
+                    LIMIT 3
+                """), {"q": f"%{cand}%"})
+                for row in res:
+                    s = row._mapping.get("sku")
+                    if s and s not in skus:
+                        skus.append(s)
+                if len(skus) >= limit:
+                    break
+    except Exception:
+        pass
+    return skus[:limit]
+
+
+def _collect_skus_from_rows(rows: List[Dict[str, Any]]) -> List[str]:
+    skus = []
+    for r in rows or []:
+        s = r.get("sku") or r.get("SKU") or r.get("item_sku")
+        if isinstance(s, str) and s not in skus:
+            skus.append(s)
+    return skus
+
+
+def _top_deficit_skus(rows: List[Dict[str, Any]], k: int = 4) -> List[str]:
+    items: List[Tuple[str, int]] = []
+    for r in rows or []:
+        try:
+            fd = int(r.get("forecasted_demand", 0))
+            ci = int(r.get("current_inventory", 0))
+            sku = r.get("sku")
+            if fd > ci and isinstance(sku, str):
+                items.append((sku, fd - ci))
+        except Exception:
+            continue
+    items.sort(key=lambda x: x[1], reverse=True)
+    return [s for s, _ in items[:k]]
+
+
 async def _fetch_supplier_summary_for_skus(sku_list: List[str], limit_per_sku: int = 3) -> Optional[str]:
-    """Call agent-service for the given SKUs and ensure per-SKU summarized output.
-    If the combined response is ambiguous (not grouped per SKU) and there are multiple SKUs,
-    fallback to querying each SKU individually and merging concise lines per SKU.
-    """
+    """Single batched call to the procurement agent. No per-SKU fallback."""
     if not sku_list:
         return None
 
-    # 1) Try combined query with explicit formatting instructions
-    joined = " and ".join(sku_list)
+    joined = ", ".join(sku_list)
     combined_msg = (
-        f"what suppliers produce {joined}? "
-        f"Please include sections titled exactly: Providers selling '{{SKU}}': for each product, "
-        f"with up to {limit_per_sku} bullet items per section (name, price with $, stock, distance in km)."
+        f"Return supplier options ONLY for the following SKUs exactly: {joined}.\n"
+        f"For EACH SKU, include a section titled exactly: Providers selling '{{SKU}}':\n"
+        f"List up to {limit_per_sku} suppliers as bullets in the format:\n"
+        f"- <Name>: $<price> - <Region> (Stock: <int>, Distance: <int>km)\n"
+        f"You may use markdown headings (e.g., '## Providers selling ...'). "
+        f"Do not include any other products or SKUs."
     )
     res = await _handle_tool_call("agent_service_query", {"message": combined_msg})
     resp_text = (res or {}).get("response") if isinstance(res, dict) else None
-    providers_text = _summarize_agent_response((resp_text or "").strip(), limit_per_sku=limit_per_sku) if resp_text else ""
+    summarized = _summarize_agent_response((resp_text or "").strip(), limit_per_sku=limit_per_sku) if resp_text else ""
 
-    def _is_ambiguous(text: str) -> bool:
-        if not text:
-            return True
-        # Ambiguous if it's generic top options without per-SKU lines
-        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        if not lines:
-            return True
-        if lines[0].lower().startswith("top supplier options:"):
-            return True
-        # Look for lines like "- sku: ..."
-        has_per_sku = any(re.match(r"^-\s*[^:]+:\s", ln) for ln in lines)
-        return not has_per_sku
+    # Always post-filter to the requested SKUs only
+    if summarized:
+        allowed = set(sku_list)
+        filtered_lines = []
+        for ln in summarized.splitlines():
+            m = re.match(r"^\-\s*([^:]+)\s*:", ln.strip())
+            if m:
+                sku = m.group(1).strip()
+                if sku not in allowed:
+                    continue
+            filtered_lines.append(ln)
+        summarized = "\n".join(filtered_lines).strip()
 
-    if len(sku_list) > 1 and _is_ambiguous(providers_text):
-        # 2) Fallback: query per SKU and merge
-        merged_lines: List[str] = ["Supplier suggestions (top options):"]
-        for sku in sku_list:
-            single_msg = (
-                f"what suppliers produce {sku}? Please include a section titled exactly: Providers selling '{sku}': "
-                f"and list at most {limit_per_sku} suppliers as bullets."
-            )
-            single_res = await _handle_tool_call("agent_service_query", {"message": single_msg})
-            single_resp_text = (single_res or {}).get("response") if isinstance(single_res, dict) else None
-            summarized = _summarize_agent_response((single_resp_text or "").strip(), limit_per_sku=limit_per_sku) if single_resp_text else ""
-            # Extract the first per-SKU line ("- sku: ...")
-            if summarized:
-                for ln in summarized.splitlines():
-                    if ln.strip().startswith(f"- {sku}:"):
-                        merged_lines.append(ln)
-                        break
-        final_text = "\n".join(merged_lines) if len(merged_lines) > 1 else providers_text
-        return final_text.strip()
-
-    return providers_text.strip() if providers_text else None
+    return summarized or None
 
 
 @router.post("")
@@ -473,7 +545,8 @@ async def chat(req: ChatRequest):
         await asyncio.sleep(0.05)
 
         try:
-            logger.info("[POST /chat] Received question. conversation_id=%s run_id=%s question=%s", req.conversation_id, req.run_id, (req.question or "")[:200])
+            logger.info("[POST /chat] Received question. conversation_id=%s run_id=%s question=%s",
+                        req.conversation_id, req.run_id, (req.question or "")[:200])
         except Exception:
             pass
 
@@ -484,6 +557,15 @@ async def chat(req: ChatRequest):
             run_id = latest.get("run_id")
         try:
             logger.info("[POST /chat] Using run_id=%s", run_id)
+        except Exception:
+            pass
+
+        # Prime focus SKUs from question text
+        try:
+            if req.conversation_id:
+                inferred = _infer_skus_from_question(req.question)
+                if inferred:
+                    _ctx.update(req.conversation_id, focus_skus=inferred)
         except Exception:
             pass
 
@@ -507,7 +589,7 @@ async def chat(req: ChatRequest):
                     sql += " LIMIT 200"
                     result = conn.execute(sql_text(sql), params)
                     rows = [dict(r._mapping) for r in result]
-                # Format a concise response
+
                 if not rows:
                     msg = "No SKUs are currently below forecasted demand in the latest run."
                     try:
@@ -515,7 +597,6 @@ async def chat(req: ChatRequest):
                     except Exception:
                         pass
                     yield msg
-                    # Save to convo memory
                     try:
                         if req.conversation_id:
                             _memory.append(req.conversation_id, "user", req.question)
@@ -523,7 +604,7 @@ async def chat(req: ChatRequest):
                     except Exception:
                         pass
                     return
-                # Prepare list and base lines
+
                 items = []
                 lines = ["SKUs running low (inventory < forecast):"]
                 for r in rows[:50]:
@@ -540,7 +621,6 @@ async def chat(req: ChatRequest):
                         sp = int(r.get("suggested_production", 0))
                     except Exception:
                         sp = r.get("suggested_production")
-                    # Compute deficit if possible
                     deficit = None
                     try:
                         deficit = int(fd) - int(ci)
@@ -552,42 +632,29 @@ async def chat(req: ChatRequest):
                     else:
                         lines.append(f"- {sku}: inv {ci}, forecast {fd}, suggested_production {sp}")
 
-                # Auto-contact external procurement agent for a few top-low SKUs
+                # Single batched procurement lookup for top deficits
                 providers_text: Optional[str] = None
                 selected_skus: List[str] = []
                 try:
-                    # Pick up to 4 most critical (largest deficit) items with a valid SKU string
-                    top_items = [it for it in items if isinstance(it.get('sku'), str)]
-                    top_items = [it for it in top_items if it.get('deficit') is not None]
+                    top_items = [it for it in items if isinstance(it.get('sku'), str) and it.get('deficit') is not None]
                     top_items.sort(key=lambda x: int(x.get('deficit', 0)), reverse=True)
                     top_items = top_items[:4]
-
                     if top_items:
                         selected_skus = [it['sku'] for it in top_items]
-                        try:
-                            logger.info("[POST /chat] Auto-procurement: querying providers for SKUs=%s", selected_skus)
-                        except Exception:
-                            pass
+                        logger.info("[POST /chat] Auto-procurement (batched) for SKUs=%s", selected_skus)
                         providers_text = await _fetch_supplier_summary_for_skus(selected_skus, limit_per_sku=3)
                 except Exception as e:
                     logger.exception("[POST /chat] Auto-procurement section failed: %s", e)
 
-                # Combine final text
                 if providers_text:
                     lines.append("")
-                    # Add a natural connective instead of a hard-coded header
                     try:
                         if selected_skus:
-                            if len(selected_skus) == 1:
-                                intro = f"I looked up supplier options for {selected_skus[0]}:"
-                            else:
-                                intro = "I looked up supplier options for " + ", ".join(selected_skus[:-1]) + f" and {selected_skus[-1]}:"
+                            intro = "I looked up supplier options for " + (", ".join(selected_skus[:-1]) + f" and {selected_skus[-1]}" if len(selected_skus) > 1 else selected_skus[0]) + ":"
                             lines.append(intro)
                     except Exception:
-                        # If anything goes wrong, skip the intro silently
                         pass
                     lines.append(providers_text)
-                    # Add a natural closing recommendation based on deficits and best suppliers
                     try:
                         best_map = _extract_best_suppliers_from_summary(providers_text)
                         rec = _compose_natural_recommendation(items, best_map)
@@ -596,29 +663,25 @@ async def chat(req: ChatRequest):
                             lines.append(rec)
                     except Exception:
                         pass
+
                 text = "\n".join(lines)
-                try:
-                    logger.info("[POST /chat] Fallback low-SKUs response generated without Bedrock. rows=%d providers_text=%s", len(rows), 'yes' if providers_text else 'no')
-                except Exception:
-                    pass
+                logger.info("[POST /chat] Fallback low-SKUs response generated without Bedrock. rows=%d providers=%s",
+                            len(rows), 'yes' if providers_text else 'no')
                 yield text
-                # Save this turn
                 try:
                     if req.conversation_id:
                         _memory.append(req.conversation_id, "user", req.question)
                         _memory.append(req.conversation_id, "assistant", text)
+                        low_skus = [it["sku"] for it in items if isinstance(it.get("sku"), str)]
+                        if low_skus:
+                            _ctx.update(req.conversation_id, focus_skus=low_skus, last_result_skus=low_skus)
                 except Exception:
                     pass
                 return
             except Exception as e:
-                # If fallback fails, continue to Bedrock path
-                try:
-                    logger.exception("[POST /chat] Low-SKUs fallback failed: %s", e)
-                except Exception:
-                    pass
+                logger.exception("[POST /chat] Low-SKUs fallback failed: %s", e)
 
         # Supplier/provider intent: directly ask external procurement agent
-        q_lower = (req.question or "").lower().strip()
         supplier_keywords = [
             "recommend a supplier",
             "recommend supplier",
@@ -649,35 +712,57 @@ async def chat(req: ChatRequest):
             "purchase",
         ]
         if any(k in q_lower for k in supplier_keywords):
-            # Forward the full natural-language question to the external procurement agent
             try:
-                logger.info("[POST /chat] Tool(agent_service_query) args={message=%s}", req.question)
-            except Exception:
-                pass
-            res = await _handle_tool_call("agent_service_query", {"message": req.question or ""})
-            resp_text = ""
-            if isinstance(res, dict):
-                resp_text = (res.get("response") or "").strip()
-            if not resp_text:
-                msg = "I couldn't retrieve supplier information right now."
-            else:
-                summarized = _summarize_agent_response(resp_text, limit_per_sku=3)
-                msg = summarized or resp_text
-            try:
+                conv_focus = _ctx.get(req.conversation_id)
+                focus_skus: List[str] = conv_focus.get("focus_skus") or conv_focus.get("last_result_skus") or []
+                inferred = _infer_skus_from_question(req.question)
+                merged_skus = list(OrderedDict.fromkeys([*inferred, *focus_skus]))[:4]
+
+                if not merged_skus:
+                    res = await _handle_tool_call("agent_service_query", {"message": req.question or ""})
+                    resp_text = ""
+                    if isinstance(res, dict):
+                        resp_text = (res.get("response") or "").strip()
+                    summarized = _summarize_agent_response(resp_text, limit_per_sku=3) if resp_text else ""
+                    msg = summarized or "I could not find matching suppliers."
+                    if req.conversation_id:
+                        _memory.append(req.conversation_id, "user", req.question)
+                        _memory.append(req.conversation_id, "assistant", msg)
+                    yield msg
+                    return
+
+                providers_text = await _fetch_supplier_summary_for_skus(merged_skus, limit_per_sku=3)
+
+                final = ""
+                if providers_text:
+                    allowed = set(merged_skus)
+                    filtered_lines = []
+                    for ln in providers_text.splitlines():
+                        m = re.match(r"^\-\s*([^:]+)\s*:", ln.strip())
+                        if m:
+                            sku = m.group(1).strip()
+                            if sku not in allowed:
+                                continue
+                        filtered_lines.append(ln)
+                    final = "\n".join(filtered_lines).strip()
+                if not final:
+                    final = "No supplier matches for the requested items."
+
                 if req.conversation_id:
                     _memory.append(req.conversation_id, "user", req.question)
-                    _memory.append(req.conversation_id, "assistant", msg)
-            except Exception:
-                pass
-            yield msg
-            return
+                    _memory.append(req.conversation_id, "assistant", final)
+                    _ctx.update(req.conversation_id, focus_skus=merged_skus, last_result_skus=merged_skus)
+
+                yield final
+                return
+            except Exception as e:
+                logger.exception("[POST /chat] Supplier intent handling failed: %s", e)
+                yield "I could not retrieve supplier information right now."
+                return
 
         br = _bedrock_client()
         if br is None:
-            try:
-                logger.info("[POST /chat] Bedrock not configured; responding with guidance")
-            except Exception:
-                pass
+            logger.info("[POST /chat] Bedrock not configured; responding with guidance")
             yield "Bedrock not configured. Please set BEDROCK_MODEL_ID."
             return
 
@@ -718,50 +803,64 @@ async def chat(req: ChatRequest):
             content = resp.get("output", {}).get("message", {}).get("content", [])
             text_parts = [p.get("text", "") for p in content if "text" in p]
             sql_query = _clean_sql("".join(text_parts))
-            try:
-                logger.info("[POST /chat] Generated SQL (truncated): %s", sql_query[:200])
-            except Exception:
-                pass
+            logger.info("[POST /chat] Generated SQL (truncated): %s", sql_query[:200])
         except Exception as e:
-            try:
-                logger.exception("[POST /chat] Error generating SQL: %s", e)
-            except Exception:
-                pass
+            logger.exception("[POST /chat] Error generating SQL: %s", e)
             yield f"Error generating SQL: {e}"
             return
 
         if not is_safe_sql(sql_query, allowed_tables, schema_map):
-            try:
-                logger.info("[POST /chat] Generated SQL failed safety checks; refusing to execute.")
-            except Exception:
-                pass
+            logger.info("[POST /chat] Generated SQL failed safety checks; refusing to execute.")
             yield "I couldn't generate a safe SQL query."
             return
 
         # Run SQL
         rows: List[Dict[str, Any]] = []
         try:
-            try:
-                logger.info("[POST /chat] Executing SQL...")
-            except Exception:
-                pass
+            logger.info("[POST /chat] Executing SQL...")
             with engine.connect() as conn:
                 result = conn.execute(sql_text(sql_query))
                 for r in result:
                     rows.append(dict(r._mapping))
-            try:
-                logger.info("[POST /chat] SQL executed. rows=%d", len(rows))
-            except Exception:
-                pass
+            logger.info("[POST /chat] SQL executed. rows=%d", len(rows))
         except Exception as e:
-            try:
-                logger.exception("[POST /chat] SQL execution error: %s", e)
-            except Exception:
-                pass
+            logger.exception("[POST /chat] SQL execution error: %s", e)
             yield f"SQL execution error: {e}"
             return
 
-        # Explain with streaming (do not store rows in memory)
+        # Update focus SKUs from rows
+        try:
+            focus_from_rows = _collect_skus_from_rows(rows)
+            if focus_from_rows and req.conversation_id:
+                _ctx.update(req.conversation_id, focus_skus=focus_from_rows, last_result_skus=focus_from_rows)
+        except Exception:
+            pass
+
+        # Proactive supplier suggestions for deficits in general path (single batched call)
+        auto_supplier_block = ""
+        top_skus_for_auto: List[str] = []
+        try:
+            top_skus_for_auto = _top_deficit_skus(rows)
+            if top_skus_for_auto:
+                prov = await _fetch_supplier_summary_for_skus(top_skus_for_auto, limit_per_sku=3)
+                if prov:
+                    # Post-filter to requested SKUs
+                    allowed = set(top_skus_for_auto)
+                    filtered_lines = []
+                    for ln in prov.splitlines():
+                        m = re.match(r"^\-\s*([^:]+)\s*:", ln.strip())
+                        if m:
+                            sku = m.group(1).strip()
+                            if sku not in allowed:
+                                continue
+                        filtered_lines.append(ln)
+                    prov = "\n".join(filtered_lines).strip()
+                    if prov:
+                        auto_supplier_block = "\n\nSupplier options for critical gaps:\n" + prov
+        except Exception:
+            pass
+
+        # Explain with streaming
         explain_user = (
             "Explain these results in plain English for a supply chain planner. Be concise and clear. "
             "You may rely on the prior conversation for context if relevant.\n\n"
@@ -770,10 +869,7 @@ async def chat(req: ChatRequest):
         )
         assistant_chunks: List[str] = []
         try:
-            try:
-                logger.info("[POST /chat] Starting streaming explanation...")
-            except Exception:
-                pass
+            logger.info("[POST /chat] Starting streaming explanation...")
             async for chunk in _stream_bedrock_explanation(
                 br,
                 model_id=_model_id(),
@@ -782,39 +878,35 @@ async def chat(req: ChatRequest):
             ):
                 assistant_chunks.append(chunk)
                 yield chunk
-            try:
-                logger.info("[POST /chat] Streaming explanation completed. total_chunks=%d", len(assistant_chunks))
-            except Exception:
-                pass
+            if auto_supplier_block:
+                yield auto_supplier_block
+                assistant_chunks.append(auto_supplier_block)
+            logger.info("[POST /chat] Streaming explanation completed. total_chunks=%d", len(assistant_chunks))
         except Exception as e:
-            try:
-                logger.exception("[POST /chat] Streaming failed: %s", e)
-            except Exception:
-                pass
+            logger.exception("[POST /chat] Streaming failed: %s", e)
             yield f"Streaming failed: {e}"
             return
-        # Save this turn to memory (question + assistant explanation)
+
+        # Persist this turn
         try:
             if conv_id:
                 _memory.append(conv_id, "user", req.question)
                 final_text = "".join(assistant_chunks)
                 _memory.append(conv_id, "assistant", final_text)
+                if top_skus_for_auto:
+                    _ctx.update(conv_id, focus_skus=top_skus_for_auto, last_result_skus=top_skus_for_auto)
         except Exception:
-            # Never fail the request due to memory bookkeeping
             pass
 
     return StreamingResponse(
         gen(),
         media_type="text/plain; charset=utf-8",
         headers={
-            # Disable proxy buffering (nginx), encourage immediate flush
             "X-Accel-Buffering": "no",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
         },
     )
-
-
 
 
 # Streaming helpers
@@ -844,7 +936,6 @@ async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text:
                 text = (delta or {}).get("text")
                 if text:
                     yield text
-                    # yield control to event loop to flush chunk
                     await asyncio.sleep(0.02)
             stop_evt = event.get("messageStop")
             if stop_evt is not None:
@@ -852,7 +943,6 @@ async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text:
         return
 
     # Fallback: non-streaming response, chunk manually
-    # Build messages with history for fallback as well
     msgs2 = []
     if history_msgs:
         msgs2.extend(history_msgs)
@@ -865,7 +955,6 @@ async def _stream_bedrock_explanation(br, model_id: Optional[str], explain_text:
     content = resp2.get("output", {}).get("message", {}).get("content", [])
     text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and "text" in p]
     full_text = "".join(text_parts)
-    # Emit in small chunks so clients can render progressively
     chunk_size = 128
     for i in range(0, len(full_text), chunk_size):
         yield full_text[i:i+chunk_size]

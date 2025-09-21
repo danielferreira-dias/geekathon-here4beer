@@ -10,7 +10,7 @@ ENV_FILE ?= .env
 # ---------- AWS/ECR ----------
 AWS_REGION ?= us-east-1
 ECR_REPO ?= here4beer/repo
-ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text 2>/dev/null)
+ACCOUNT_ID := 816308070251
 ECR_REGISTRY := $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 ECR_IMAGE := $(ECR_REGISTRY)/$(ECR_REPO):latest
 
