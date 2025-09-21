@@ -1,0 +1,51 @@
+From: no-reply@meusite.com
+To: contato@exemplo.com
+Subject: Pedido confirmado #12345
+Date: Sun, 21 Sep 2025 00:54:29 +0000
+Message-ID: <175841606928.11.11068628172177590014@meusite.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============1908549756391621807=="
+
+--===============1908549756391621807==
+Content-Type: multipart/alternative;
+ boundary="===============8513911248033390529=="
+
+--===============8513911248033390529==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+Olá,
+
+Seu pedido #12345 foi confirmado e está sendo processado.
+Qualquer dúvida, responda a este e-mail.
+
+Abraços,
+Equipe Minha Loja
+
+--===============8513911248033390529==
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<!doctype html>
+<html>
+  <body>
+    <p>Ol=C3=A1,</p>
+    <p>Seu pedido <strong>#12345</strong> foi confirmado e est=C3=A1 sendo pr=
+ocessado.</p>
+    <p>Qualquer d=C3=BAvida, basta responder a este e-mail.</p>
+    <p>Abra=C3=A7os,<br>Equipe Minha Loja</p>
+  </body>
+</html>
+
+--===============8513911248033390529==--
+
+--===============1908549756391621807==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+Content-Disposition: attachment; filename="nota.txt"
+MIME-Version: 1.0
+
+Este é um anexo de exemplo (nota interna).
+
+--===============1908549756391621807==--

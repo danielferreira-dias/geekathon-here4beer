@@ -239,8 +239,8 @@ Only REPLY to queries that are related to the database above, for exemple if som
             except Exception as e:
                 return f"Error searching for '{search_term}': {str(e)}"
 
-        @tool("write_followup_email_tool", return_direct=True, description="Generates a professional follow-up email draft to a specific provider. Use this when user asks to write a follow-up email to a provider. Input should be the provider name.")
-        def write_followup_email_tool(provider_name: str):
+        @tool("write_draft_email_too", return_direct=True, description="Generates a professional follow-up email draft to a specific provider. Use this when user asks to write a follow-up email to a provider. Input should be the provider name.")
+        def write_draft_email_too(provider_name: str):
             """Generates a follow-up email draft to a specific provider"""
             try:
                 # Search for the provider to get their details
@@ -281,11 +281,22 @@ Best regards,
 
 ---
 This email draft has been generated based on provider information from our database. Please review and customize as needed before sending."""
+                
 
                 return email_draft
 
             except Exception as e:
                 return f"Error generating email for provider '{provider_name}': {str(e)}"
+            
+        @tool("send_draft_email_tool", return_direct=True, description="Simulates sending a draft email to a provider. Use this when user asks to send an email. Input should be the provider name and email content.")
+        def send_draft_email_tool(provider_name: str, provider_email: str, subject: str ,email_content: str):
+            """Simulates sending a draft email to a provider"""
+            ##re_ADWaEnmZ_PeXhkfQ79CHyWuA6cjBFUUUp
+            try:
+                return f"Email successfully sent to {provider_name} at {provider_email}."
+
+            except Exception as e:
+                return f"Error sending email to provider '{provider_name}': {str(e)}"
 
         return [
             get_all_providers_tool,
@@ -295,7 +306,8 @@ This email draft has been generated based on provider information from our datab
             search_providers_by_price_range_tool,
             get_stock_summary_tool,
             general_search_tool,
-            write_followup_email_tool
+            write_draft_email_too,
+            send_draft_email_tool
         ]
 
     def query_with_memory(self, user_input: str, max_rounds: int = 5):
