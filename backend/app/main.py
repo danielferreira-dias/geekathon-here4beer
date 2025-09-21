@@ -1,4 +1,5 @@
 import os
+import logging
 from typing import Dict, Any
 
 from fastapi import FastAPI
@@ -8,6 +9,21 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env as early as possible (before importing routers/services)
 load_dotenv()
+
+# Configure app-wide logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_FORMAT = os.getenv(
+    "LOG_FORMAT",
+    "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+# Avoid reconfiguring logging if already configured (e.g., under uvicorn)
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
+else:
+    logging.getLogger().setLevel(LOG_LEVEL)
+
+logger = logging.getLogger("app")
+logger.info("Logging configured", extra={"level": LOG_LEVEL})
 
 from app.routers.analyze import router as analyze_router
 from app.routers import chat as chat_router
@@ -56,7 +72,7 @@ async def _init_db_on_startup():
                 conn.commit()
     except Exception as e:
         # Don’t crash startup if this fails; logs help debug
-        print(f"Schema check/migration for runs.summary_text failed: {e}")
+        logging.getLogger(__name__).exception("Schema check/migration for runs.summary_text failed: %s", e)
 
     # Start scheduler for Risk Sentry at 08:00 UTC daily
     tz = pytz.UTC
@@ -67,7 +83,7 @@ async def _init_db_on_startup():
             risks = get_risks()
             post_briefing(risks.get("summary", "No summary"))
         except Exception as e:
-            print(f"Risk Sentry failed: {e}")
+            logging.getLogger(__name__).exception("Risk Sentry failed: %s", e)
 
     scheduler.add_job(_daily_risk_job, CronTrigger(hour=8, minute=0))
     scheduler.start()
