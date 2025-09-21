@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Frontend - Clotho (React + Vite)
+  frontend:
+    build:
+      context: ./Clotho
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+      - agent-service
+    networks:
+      - here4beer-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID}
+      - PORT=8000
+    volumes:
+      - ./backend/data.db:/app/data.db
+    networks:
+      - here4beer-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Agent Service (FastAPI)
+  agent-service:
+    build:
+      context: ./agent-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    environment:
+      - AWS_REGION=${AWS_REGION}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID}
+    volumes:
+      - ./.env:/app/.env:ro
+    networks:
+      - here4beer-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+networks:
+  here4beer-network:
+    driver: bridge
+
+volumes:
+  backend-data:
+    driver: local
